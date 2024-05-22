@@ -34,11 +34,11 @@ library
     , aeson
     , base >=4.9 && <5
     , bytestring
-    , cardano-api
     , plutus-ledger
-    , plutus-ledger-api ^>=1.27.0.0
-    , plutus-tx ^>=1.27.0.0
-    , plutus-tx-plugin ^>=1.27.0.0
+    , plutus-ledger-api
+    , plutus-script-utils
+    , plutus-tx
+    , plutus-tx-plugin
     , serialise
 
 executable en-registration
@@ -50,10 +50,26 @@ executable en-registration
     , aeson
     , base >=4.9 && <5
     , bytestring
-    , cardano-api
     , containers
-    , plutus-ledger-api ^>=1.27.0.0
-    , plutus-tx ^>=1.27.0.0
+    , plutus-ledger-api
+    , plutus-script-utils
+    , plutus-tx
     , serialise
     , text
     , wm-earthnode-registration
+
+test-suite en-registration-test
+  hs-source-dirs:     test
+  type:               exitcode-stdio-1.0
+  main-is:            Spec.hs
+  other-modules:      OnChainSpec
+  build-depends:
+    , base >=4.9 && <5
+    , cooked-validators
+    , hspec
+    , plutus-script-utils
+    , QuickCheck
+    , wm-earthnode-registration
+
+  build-tool-depends: hspec-discover:hspec-discover
+  ghc-options:        -threaded

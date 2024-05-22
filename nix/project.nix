@@ -11,7 +11,7 @@ let
     {
       name = "en-registration";
       src = ../.;
-      compiler-nix-name = lib.mkDefault "ghc96";
+      compiler-nix-name = "ghc963";
       shell.withHoogle = false;
       inputMap = {
         "https://input-output-hk.github.io/cardano-haskell-packages" = inputs.iogx.inputs.CHaP;
