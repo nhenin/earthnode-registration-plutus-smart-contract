@@ -71,6 +71,9 @@ updateRegistration ScriptParams{..} sig ctx
     opOk d1 d2 = pEnOpCs d1 == pEnOpCs d2 && enUsedNftTn d1 == enUsedNftTn d2
 
     -- Check if the new datum was signed by the current CceAddress, the signature must be provided by the redeemer
+    -- N.B "checkDatumSig" takes all inputs from the datum passed to the function; here we take the newDatum for verification,
+    -- but the PubKey is taken from the current (old) Datum, so we can be sure the signer of the new datum is the
+    -- same who signed the old datum.
     newDatumSigned = BI.verifySchnorrSecp256k1Signature (enConsensusPubKey cDat) (makeMessage nDat) sig
 
     -- Construct the EnRegistration

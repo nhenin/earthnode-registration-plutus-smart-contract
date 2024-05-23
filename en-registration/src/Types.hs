@@ -43,14 +43,22 @@ PlutusTx.makeLift ''ScriptParams
 
 data EnRegistration = EnRegistration
     { enOperatorAddress :: BuiltinByteString
+    -- ^ Owner Account which is operating the Aya Validator on the Aya chain
     , enConsensusPubKey :: BuiltinByteString
+    -- ^ Validator Pubkey of the consensus Node
     , enMerkleTreeRoot :: BuiltinByteString
+    -- ^ MerkleRoot for verifiable randomness (this will disappear)
     , enCceAddress :: BuiltinByteString
+    -- ^ CrossChain Pubkey which can be verified on both chains
     , enUsedNftTn :: TokenName
+    -- ^ Unique ENNFT name, "used" for this registration
     , enRwdWallet :: PubKeyHash
+    -- ^ Operator's wallet where rewards will be delivered after participating in a block production in Aya
     , enCommission :: Integer
+    -- ^ Commission in percent shared with staking delegators.
     , pEnOpCs :: CurrencySymbol -- We cannot store the EnOpNft CurrencySymbol in the parameter because we get a cyclic dependency
     , enSignature :: BuiltinByteString
+    -- ^ Signature of the datum. All datum fields concatenated and signed by the enCceAddress
     }
     deriving (Prelude.Show, Generic, FromJSON, ToJSON, Prelude.Eq, Prelude.Ord)
 

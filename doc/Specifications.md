@@ -74,4 +74,47 @@ TBD
 
 ## Executable Specifications
 
-TBD
+### Register  
+A valid Registration produces a an NFT (ENOPNFT), therefore the Register Action is under the responsability of the ENOPNFT Minting Script.
+
+### Properties for Minting the ENOPNFT 
+
+An ENOPNFT is only minted if its corresponding ENNFT is locked on the script with a valid EnRegistration :    
+
+1. The ENNFT is on the UTxO value that will be stored in the Right Validator Registration Script
+2. `enopnft.tokenName == ennft.tokenName`
+2. Datum is signed with AV PubKey contained in the Datum (using ZK1 Signatures)
+3. ENRegistration Datum is valid 
+```haskell
+data EnRegistration = EnRegistration
+    { -- | Owner Account which is operating the Aya Validator on the Aya chain  
+      enOperatorAddress :: BuiltinByteString
+      -- | Validator Pubkey of the consensus Node
+    , enConsensusPubKey :: BuiltinByteString
+      -- | MerkleRoot for verifiable randomness (this will disappear)
+    , enMerkleTreeRoot :: BuiltinByteString
+      -- | CrossChain Pubkey which can be verified on both chains
+    , enCceAddress :: BuiltinByteString
+      -- | Unique ENNFT name, "used" for this registration
+    , enUsedNftTn :: TokenName
+      -- | Operator's wallet where rewards will be delivered after participating in a block production in Aya
+    , enRwdWallet :: PubKeyHash
+      -- | Commission in percent shared with staking delegators.
+    , enCommission :: Integer
+      -- | We cannot store the EnOpNft CurrencySymbol in the parameter because we get a cyclic ?dependency
+      -- Nicolas Henin : This should be removed, it can be retrieved Offchain 
+    , pEnOpCs :: CurrencySymbol 
+      -- | Signature of the datum. All datum fields concatenated and signed by the enCceAddress  
+    , enSignature :: BuiltinByteString
+    }
+    deriving (Prelude.Show, Generic, FromJSON, ToJSON, Prelude.Eq, Prelude.Ord)
+```
+ - Not Clear : How Do we validate sidechain params : 
+    - ReferenceInput AyACommitteeUTxO, which must contain the Sidechain Identity NFT ? 
+    - Sidechain Parameter Hash must match with that in the AyACommitteeUTxO’s Inline-Datum and it must contain the Identity-NFT of the sidechain for verification
+ - `datum.enUsedNftTn.tokenName == enopnft.tokenName == value.ennft.tokenName`
+
+
+ ## Update 
+
+ ## Unregistrer

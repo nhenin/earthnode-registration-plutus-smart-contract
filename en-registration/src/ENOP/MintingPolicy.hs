@@ -87,11 +87,13 @@ enOpBurnt cs v info =
         burn_amt == -1
 
 {-- mintEnOpNft --}
--- Validates that the enopnft is minted only if the registration conditions are met
--- Makes sure the ennft is paid to the registration smart contract and the UTxO contains
--- a valid ENRegistration Datum with that ennft stored in the datum and
+-- Properties for Minting the ENOPNFT :
+-- 1. The ENNFT is in the UTxO value
+-- 2. enopnft.tokenName == ennft.tokenName
+-- 2. Datum is signed with AV PubKey contained in the Datum
+-- 3. ENRegistration Datum is valid
+
 -- the enopnft is named same as the ennft. Also the own currency symbol must be stored correctly in the datum.
--- Additionally it checks the Aya Signature of this Datum.
 {-# INLINEABLE mintEnOpNft #-}
 mintEnOpNft :: ScriptParams -> CurrencySymbol -> TxInfo -> Bool
 mintEnOpNft ScriptParams{..} ocs info

@@ -34,8 +34,8 @@ import qualified PlutusTx
 import qualified Prelude
 
 data ScriptParams = ScriptParams
-    { spNftCs :: CurrencySymbol
-    , spRegContr :: ValidatorHash
+    { spNftCs :: CurrencySymbol -- What is spNftCs?
+    , spRegContr :: ValidatorHash -- What is spRegContr?
     }
     deriving (Prelude.Show, Generic, FromJSON, ToJSON, Prelude.Eq, Prelude.Ord)
 
