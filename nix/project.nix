@@ -9,7 +9,7 @@ let
       isCross = pkgs.stdenv.hostPlatform != pkgs.stdenv.buildPlatform;
     in
     {
-      name = "en-registration";
+      name = "en-registration-plutus";
       src = ../.;
       compiler-nix-name = "ghc963";
       shell.withHoogle = false;

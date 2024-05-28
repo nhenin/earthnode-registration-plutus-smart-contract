@@ -3,7 +3,7 @@
 cabalProject:
 
 {
-  name = "en-registration";
+  name = "en-registration-plutus";
 
   packages = [
     pkgs.scriv

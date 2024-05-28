@@ -79,14 +79,14 @@ A valid Registration produces a an NFT (ENOPNFT), therefore the Register Action 
 
 ### Properties for Minting the ENOPNFT 
 
-An ENOPNFT is only minted if its corresponding ENNFT is locked on the script with a valid EnRegistration :    
+An ENOPNFT is only minted if its corresponding ENNFT is locked on the script with a valid RegistrationDatum :    
 
 1. The ENNFT is on the UTxO value that will be stored in the Right Validator Registration Script
 2. `enopnft.tokenName == ennft.tokenName`
 2. Datum is signed with AV PubKey contained in the Datum (using ZK1 Signatures)
 3. ENRegistration Datum is valid 
 ```haskell
-data EnRegistration = EnRegistration
+data RegistrationDatum = RegistrationDatum
     { -- | Owner Account which is operating the Aya Validator on the Aya chain  
       enOperatorAddress :: BuiltinByteString
       -- | Validator Pubkey of the consensus Node
@@ -117,4 +117,12 @@ data EnRegistration = EnRegistration
 
  ## Update 
 
+    - A ENOPNFT matching the stored ENNFT needs to be provided 
+    - only a subset of fields could be updated ? 
+    - datum needs to be correctly signed 
+    - The ENOPNFT need to be returned to the same address as the input one ? (at least it should be put in the script utxo)
+
  ## Unregistrer
+
+    - A ENOPNFT matching the stored ENNFT needs to be provided
+    - The ENOPNFT needs to be burned.

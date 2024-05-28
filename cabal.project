@@ -19,7 +19,7 @@ index-state:
   , cardano-haskell-packages 2024-03-21T00:00:00Z
 
 packages:
-  en-registration
+  en-registration-plutus
 
 tests: True
 
