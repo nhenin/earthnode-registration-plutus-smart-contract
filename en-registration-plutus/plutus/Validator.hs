@@ -31,7 +31,6 @@ module Validator (
     RegistrationAction (..),
 ) where
 
-import Data.Aeson (FromJSON, ToJSON)
 import GHC.Generics (Generic)
 
 import Plutus.Script.Utils.Value
@@ -41,13 +40,13 @@ import PlutusTx.Prelude as Plutus.Prelude
 import Prelude qualified
 
 -- import qualified PlutusTx.Builtins as BI
-import Ledger ()
+
 import Plutus.Script.Utils.V3.Contexts
 
 newtype ENNFTCurrencySymbol = ENNFTCurrencySymbol
     { ennftCurrencySymbol :: CurrencySymbol
     }
-    deriving (Prelude.Show, Generic, FromJSON, ToJSON, Ord)
+    deriving (Prelude.Show, Generic, Ord)
 
 instance Eq ENNFTCurrencySymbol where
     {-# INLINEABLE (==) #-}
@@ -69,7 +68,7 @@ data RegistrationDatum = RegistrationDatum
     , datumSigned :: BuiltinByteString
     -- ^ Signature of the datum. All datum fields concatenated and signed by the enCceAddress
     }
-    deriving (Prelude.Show, Generic, FromJSON, ToJSON, Ord)
+    deriving (Prelude.Show, Generic, Ord)
 
 instance Eq RegistrationDatum where
     {-# INLINEABLE (==) #-}
@@ -98,7 +97,7 @@ data RegistrationAction
       Unregister
     | -- | Update the registration information
       Update BuiltinByteString
-    deriving (Prelude.Show, Generic, FromJSON, ToJSON, Prelude.Eq, Prelude.Ord)
+    deriving (Prelude.Show, Generic, Prelude.Eq, Prelude.Ord)
 
 PlutusTx.makeIsDataIndexed ''RegistrationAction [('Unregister, 0), ('Update, 1)]
 PlutusTx.makeLift ''RegistrationAction

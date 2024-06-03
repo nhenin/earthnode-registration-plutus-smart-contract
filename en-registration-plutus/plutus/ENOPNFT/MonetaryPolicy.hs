@@ -25,7 +25,7 @@ module ENOPNFT.MonetaryPolicy (
 
 import qualified Plutus.Script.Utils.Scripts as Script
 import qualified Plutus.Script.Utils.Typed as Script
-import PlutusTx
+import PlutusTx (applyCode, compile, liftCodeDef)
 
 import Data.Either (Either (Left, Right))
 

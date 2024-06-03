@@ -11,7 +11,7 @@ let
     {
       name = "en-registration-plutus";
       src = ../.;
-      compiler-nix-name = "ghc963";
+      compiler-nix-name = "ghc964";
       shell.withHoogle = false;
       inputMap = {
         "https://input-output-hk.github.io/cardano-haskell-packages" = inputs.iogx.inputs.CHaP;
