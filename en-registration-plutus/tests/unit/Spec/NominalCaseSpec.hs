@@ -64,8 +64,8 @@ genFixtureNominalCase = do
 
 anyPartnerChainValidatorSettings :: Gen PartnerChainValidatorSettings
 anyPartnerChainValidatorSettings = do
-    operatorAddress <- fmap toBuiltin $ genByteStringOf 28
-    enCommission <- arbitrary
+    ayaValidatorPublicKey <- fmap toBuiltin $ genByteStringOf 28
+    commission <- arbitrary
     pure PartnerChainValidatorSettings{..}
 
 anyCurrencySymbol :: Gen CurrencySymbol

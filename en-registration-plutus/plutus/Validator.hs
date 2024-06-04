@@ -26,6 +26,7 @@
 module Validator (
     untypedValidator,
     validator,
+    checkRegistrationSignature,
     ENNFTCurrencySymbol (..),
     RegistrationDatum (..),
     RegistrationAction (..),
@@ -39,7 +40,7 @@ import PlutusTx qualified
 import PlutusTx.Prelude as Plutus.Prelude
 import Prelude qualified
 
--- import qualified PlutusTx.Builtins as BI
+import PlutusTx.Builtins qualified as Cryptography
 
 import Plutus.Script.Utils.V3.Contexts
 
@@ -56,38 +57,56 @@ PlutusTx.unstableMakeIsData ''ENNFTCurrencySymbol
 PlutusTx.makeLift ''ENNFTCurrencySymbol
 
 data RegistrationDatum = RegistrationDatum
-    { operatorAddress :: BuiltinByteString
-    -- ^ Owner Account which is operating the Aya Validator on the Aya chain
+    { ayaValidatorPublicKey :: BuiltinByteString
+    -- ^ Substrate Public Keys of the Aya Validator
+    , signature :: BuiltinByteString
+    -- ^ Signature of the datum. All datum fields below concatenated and signed by the substrateAVPublicKey
     , ennftTokenName :: TokenName
     -- ^ Unique ENNFT name, "used" for this registration
-    , rewardWallet :: PubKeyHash
+    , cardanoRewardPubKey :: PubKeyHash
     -- ^ Operator's wallet where rewards will be delivered after participating in a block production in Aya
-    , enCommission :: Integer
+    , commission :: Integer
     -- ^ Commission in percent shared with staking delegators.
     , enopNFTCurrencySymbol :: CurrencySymbol -- We cannot store the EnOpNft CurrencySymbol in the parameter because we get a cyclic dependency
-    , datumSigned :: BuiltinByteString
-    -- ^ Signature of the datum. All datum fields concatenated and signed by the enCceAddress
     }
     deriving (Prelude.Show, Generic, Ord)
 
 instance Eq RegistrationDatum where
     {-# INLINEABLE (==) #-}
     x == y =
-        operatorAddress x
-            == operatorAddress y
+        ayaValidatorPublicKey x
+            == ayaValidatorPublicKey y
             && ennftTokenName x
             == ennftTokenName y
-            && rewardWallet x
-            == rewardWallet y
-            && enCommission x
-            == enCommission y
+            && cardanoRewardPubKey x
+            == cardanoRewardPubKey y
+            && commission x
+            == commission y
             && enopNFTCurrencySymbol x
             == enopNFTCurrencySymbol y
-            && datumSigned x
-            == datumSigned y
+            && signature x
+            == signature y
 
 PlutusTx.makeIsDataIndexed ''RegistrationDatum [('RegistrationDatum, 0)]
 PlutusTx.makeLift ''RegistrationDatum
+
+-- {-# INLINABLE checkDatumSig #-}
+-- Check the signature of the registration datum
+checkRegistrationSignature :: RegistrationDatum -> Bool
+checkRegistrationSignature registrationDatum@RegistrationDatum{..} =
+    Cryptography.verifySchnorrSecp256k1Signature
+        ayaValidatorPublicKey
+        (mkHashedRegistrationMessage registrationDatum)
+        signature
+
+{-# INLINEABLE mkHashedRegistrationMessage #-}
+mkHashedRegistrationMessage :: RegistrationDatum -> BuiltinByteString
+mkHashedRegistrationMessage RegistrationDatum{..} =
+    Cryptography.blake2b_256
+        . appendByteString (unTokenName ennftTokenName)
+        . appendByteString (getPubKeyHash cardanoRewardPubKey)
+        . consByteString commission
+        $ unCurrencySymbol enopNFTCurrencySymbol
 
 {- | The actions that can be performed by the operator
 | N.B : The action Register is enforced by the ENOPNFT NFT minting policy
@@ -172,16 +191,6 @@ updateRegistration ENNFTCurrencySymbol{..} _ ctx
     makeEnRegDatum = unsafeFromBuiltinData . getDatum
 
     info = scriptContextTxInfo ctx
-
--- {-# INLINABLE checkDatumSig #-}
--- -- Check the signature of the registration datum
--- checkDatumSig :: RegistrationDatum -> Bool
--- checkDatumSig dat@RegistrationDatum {..} = BI.verifySchnorrSecp256k1Signature enOperatorAddress (makeMessage dat) enSignature
-
--- {-# INLINABLE makeMessage #-}
--- -- Make the signed message
--- makeMessage :: RegistrationDatum -> BuiltinByteString
--- makeMessage RegistrationDatum {..} = BI.blake2b_256 $ appendByteString (unCurrencySymbol pEnOpCs) $ consByteString enCommission $ appendByteString (getPubKeyHash enRwdWallet) $ appendByteString (unTokenName enUsedNftTn) enOperatorAddress
 
 {-# INLINEABLE validateUnregister #-}
 validateUnregister :: ENNFTCurrencySymbol -> RegistrationDatum -> ScriptContext -> Bool

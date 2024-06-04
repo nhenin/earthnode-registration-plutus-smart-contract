@@ -49,6 +49,7 @@ import Plutus.Script.Utils.Value (flattenValue, valueOf)
 import PlutusLedgerApi.V3
 import PlutusLedgerApi.V3.Contexts (ownCurrencySymbol, valuePaidTo)
 import PlutusTx.AssocMap qualified as Map
+import Validator (RegistrationDatum, checkRegistrationSignature)
 
 data MonetaryPolicySettings = MonetaryPolicySettings
     { ennftCurrencySymbol :: CurrencySymbol
@@ -110,11 +111,12 @@ enOpBurnt cs v info =
 {-# INLINEABLE canMintENOPNFT #-}
 canMintENOPNFT :: MonetaryPolicySettings -> CurrencySymbol -> TxInfo -> Bool
 canMintENOPNFT monetaryPolicySettings enopNFTCurrencySymbol txInfo =
-    ( \(_, scriptValue) ->
+    ( \(scriptDatum, scriptValue) ->
         let enopTokenName = getENOPNFTTokenName enopNFTCurrencySymbol txInfo
             ennftTokenName = getENNFTTokenName monetaryPolicySettings scriptValue
          in traceIfFalse "Can't Mint ENNOP - ENOPNFT and ENNFT TokenNames are not equal" (enopTokenName == ennftTokenName)
                 && traceIfFalse "Can't Mint ENNOP - ENNOP Minted Not Output to Operator" (isENOPNFTGivenToOperator txInfo enopNFTCurrencySymbol)
+                && traceIfFalse "Can't Mint ENNOP - Registration Signature Verification Failed" (checkRegistrationSignature scriptDatum)
     )
         $ getScriptDatumAndValueSpent monetaryPolicySettings txInfo
 
@@ -159,30 +161,18 @@ getENNFTTokenName MonetaryPolicySettings{ennftCurrencySymbol} value =
         $ getNFTTokenNames ennftCurrencySymbol value
 
 {-# INLINEABLE getScriptDatumAndValueSpent #-}
-getScriptDatumAndValueSpent :: MonetaryPolicySettings -> TxInfo -> (BuiltinData, Value)
+getScriptDatumAndValueSpent :: MonetaryPolicySettings -> TxInfo -> (RegistrationDatum, Value)
 getScriptDatumAndValueSpent MonetaryPolicySettings{registrationValidatorHash} txInfo =
     \case
-        [(OutputDatum (Datum scriptDatum), scriptValue)] -> (scriptDatum, scriptValue)
+        [(OutputDatum (Datum scriptDatum), scriptValue)] ->
+            case fromBuiltinData scriptDatum of
+                Nothing -> traceError "Can't Mint ENNOP - Registration datum is not valid"
+                Just registrationDatum -> (registrationDatum, scriptValue)
         [] -> traceError "Can't Mint ENNOP - Registration validator output not found"
         [(NoOutputDatum, _)] -> traceError "Can't Mint ENNOP - Registration validator output has no datum"
         [(OutputDatumHash _, _)] -> traceError "Can't Mint ENNOP - Registration validator output has only the hashed datum"
         _ : _ -> traceError "Can't Mint ENNOP - More than one Registration validator output is not allowed"
         $ scriptOutputsAt registrationValidatorHash txInfo
-
--- We check if the script output has a correctly formated datum we also verify the datum was signed by the Consensuspubkey
--- and that the tokenname's of the ennft and  enopnft are matching and the ENOPNFT policy ID is stored correctly in the registration datum.
--- checkEnRegDatum :: EnRegistration -> Bool
--- checkEnRegDatum dat@EnRegistration {..} = pEnOpCs == ocs && enUsedNftTn == tn && checkDatumSig dat
-
--- {-# INLINABLE checkDatumSig #-}
--- -- Check the signature of the registration datum
--- checkDatumSig :: RegistrationDatum -> Bool
--- checkDatumSig dat@RegistrationDatum {..} = BI.verifySchnorrSecp256k1Signature enOperatorAddress (makeMessage dat) enSignature
-
--- {-# INLINABLE makeMessage #-}
--- -- Make the signed message
--- makeMessage :: RegistrationDatum -> BuiltinByteString
--- makeMessage RegistrationDatum {..} = BI.blake2b_256 $ appendByteString (unCurrencySymbol pEnOpCs) $ consByteString enCommission $ appendByteString (getPubKeyHash enRwdWallet) $ appendByteString (unTokenName enUsedNftTn) enOperatorAddress
 
 {-- getTokenName --}
 -- We determine the TokenName from the input of the registration smart contract,

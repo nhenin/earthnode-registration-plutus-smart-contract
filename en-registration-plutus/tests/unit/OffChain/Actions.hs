@@ -46,9 +46,9 @@ type ENNFT = NFT
 type ENOPNFT = NFT
 
 data PartnerChainValidatorSettings = PartnerChainValidatorSettings
-    { operatorAddress :: BuiltinByteString
+    { ayaValidatorPublicKey :: BuiltinByteString
     -- ^ Owner Account which is operating the Aya Validator on the Aya chain
-    , enCommission :: Integer
+    , commission :: Integer
     -- ^ Commission in percent shared with staking delegators.
     }
     deriving (Show)
@@ -59,7 +59,7 @@ register ::
     ENNFT ->
     Wallet ->
     m ENOPNFT
-register PartnerChainValidatorSettings{operatorAddress = givenOperatorAddress} ennft wallet = do
+register PartnerChainValidatorSettings{ayaValidatorPublicKey = givenAyaValidatorPublicKey, commission = givenCommission} ennft wallet = do
     let settings = coerce . currencySymbol $ ennft
     _ <-
         validateTxSkel $
@@ -78,12 +78,12 @@ register PartnerChainValidatorSettings{operatorAddress = givenOperatorAddress} e
                     , paysScriptInlineDatum
                         (typedScript settings)
                         ( RegistrationDatum
-                            { rewardWallet = walletPKHash wallet
-                            , operatorAddress = givenOperatorAddress
-                            , enopNFTCurrencySymbol = associatedENOPNFTCurrencySymbol settings
+                            { ayaValidatorPublicKey = givenAyaValidatorPublicKey
+                            , signature = givenAyaValidatorPublicKey
                             , ennftTokenName = tokenName ennft
-                            , enCommission = 1
-                            , datumSigned = givenOperatorAddress
+                            , cardanoRewardPubKey = walletPKHash wallet
+                            , commission = givenCommission
+                            , enopNFTCurrencySymbol = associatedENOPNFTCurrencySymbol settings
                             }
                         )
                         (V3.singleton (currencySymbol ennft) (tokenName ennft) 1)
