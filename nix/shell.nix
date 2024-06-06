@@ -7,6 +7,8 @@ cabalProject:
 
   packages = [
     pkgs.scriv
+    pkgs.cargo
+
   ];
 
   preCommit = {

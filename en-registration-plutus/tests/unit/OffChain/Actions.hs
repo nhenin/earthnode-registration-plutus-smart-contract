@@ -1,12 +1,15 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators #-}
 
 module OffChain.Actions (
     ENNFT (..),
     ENOPNFT (..),
     NFT (..),
-    PartnerChainValidatorSettings (..),
+    Commission,
     register,
 ) where
 
@@ -14,53 +17,61 @@ import Cardano.Api qualified as Cardano
 import Cardano.Node.Emulator qualified as Emulator
 import Control.Monad (void)
 import Cooked
-import Cooked.Output
-import Cooked.Pretty.Class
-import Cooked.ValueUtils
-import Cooked.Wallet
+
 import Data.Default
-import Data.Function
+
 import Data.List (foldl')
 import Data.List.NonEmpty qualified as NEList
 import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.Map.NonEmpty (NEMap)
 import Data.Map.NonEmpty qualified as NEMap
-import Data.Maybe
+
 import Data.Set (Set)
 import Data.Set qualified as Set
-import ENOPNFT.Validator
+import ENOPNFT.Validator (Action (..))
 import Plutus.Script.Utils.Scripts qualified as Script
 
+import Adapter.CardanoCryptoClass.Crypto (DSIGNAlgorithm (..), Ed25519DSIGN, KeyPair (signatureKey, verificationKey), ToByteString (toByteString), sign)
 import Control.Monad.IO.Class (MonadIO (..))
+import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import PlutusLedgerApi.V1.Value qualified as Value
-import PlutusLedgerApi.V3 (BuiltinByteString, CurrencySymbol, PubKeyHash, TokenName, toBuiltinData)
+import PlutusLedgerApi.V3 (BuiltinByteString, CurrencySymbol, PubKeyHash, TokenName, fromBuiltin, toBuiltin, toBuiltinData)
 import PlutusLedgerApi.V3 qualified as Api
 import PlutusLedgerApi.V3 qualified as V3
-import Script
-import Validator (ENNFTCurrencySymbol (..), RegistrationDatum (..))
+import Script (
+    associatedENOPNFTCurrencySymbol,
+    associatedENOPNFTMonetaryPolicy,
+    typedScript,
+ )
+import Validator (ENNFTCurrencySymbol (..), RegistrationDatum (..), mkHashedRegistrationMessage)
 
 data NFT = NFT {currencySymbol :: CurrencySymbol, tokenName :: TokenName} deriving (Eq, Show)
 type ENNFT = NFT
 type ENOPNFT = NFT
-
-data PartnerChainValidatorSettings = PartnerChainValidatorSettings
-    { ayaValidatorPublicKey :: BuiltinByteString
-    -- ^ Owner Account which is operating the Aya Validator on the Aya chain
-    , commission :: Integer
-    -- ^ Commission in percent shared with staking delegators.
-    }
-    deriving (Show)
+type Commission = Integer
 
 register ::
+    (ContextDSIGN a ~ (), DSIGNAlgorithm a, Signable a ByteString) =>
     (MonadBlockChain m) =>
-    PartnerChainValidatorSettings ->
+    KeyPair a ->
     ENNFT ->
+    Commission ->
     Wallet ->
     m ENOPNFT
-register PartnerChainValidatorSettings{ayaValidatorPublicKey = givenAyaValidatorPublicKey, commission = givenCommission} ennft wallet = do
+register keyPair ennft commission wallet = do
     let settings = coerce . currencySymbol $ ennft
+        signedMessage =
+            sign
+                (signatureKey keyPair)
+                ( fromBuiltin $
+                    mkHashedRegistrationMessage
+                        (tokenName ennft)
+                        (walletPKHash wallet)
+                        commission
+                        (associatedENOPNFTCurrencySymbol settings)
+                )
     _ <-
         validateTxSkel $
             txSkelTemplate
@@ -78,11 +89,11 @@ register PartnerChainValidatorSettings{ayaValidatorPublicKey = givenAyaValidator
                     , paysScriptInlineDatum
                         (typedScript settings)
                         ( RegistrationDatum
-                            { ayaValidatorPublicKey = givenAyaValidatorPublicKey
-                            , signature = givenAyaValidatorPublicKey
+                            { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
+                            , signature = toBuiltin signedMessage
                             , ennftTokenName = tokenName ennft
                             , cardanoRewardPubKey = walletPKHash wallet
-                            , commission = givenCommission
+                            , commission = commission
                             , enopNFTCurrencySymbol = associatedENOPNFTCurrencySymbol settings
                             }
                         )

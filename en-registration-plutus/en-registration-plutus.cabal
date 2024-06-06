@@ -6,6 +6,7 @@ maintainer:         torben.poguntke@worldmobile.io
 copyright:          © 2023 World Mobile Group
 build-type:         Simple
 extra-source-files: CHANGELOG.md
+data-files:         tests/unit/data/generatedSubstrateEd25519Keys.json
 
 flag defer-plugin-errors
   description:
@@ -44,18 +45,23 @@ test-suite en-registration-unit-tests
   type:               exitcode-stdio-1.0
   main-is:            Main.hs
   other-modules:
+    Adapter.CardanoCryptoClass.Crypto
+    Fixture.Register
     OffChain.Actions
     Spec.NominalCaseSpec
 
   build-depends:
+    , aeson
     , base >=4.9 && <5
     , bytestring
     , cardano-api
+    , cardano-crypto-class
     , cardano-node-emulator
     , containers
     , cooked-validators
     , data-default
     , en-registration-plutus
+    , hex-text
     , nonempty-containers
     , plutus-ledger-api
     , plutus-script-utils

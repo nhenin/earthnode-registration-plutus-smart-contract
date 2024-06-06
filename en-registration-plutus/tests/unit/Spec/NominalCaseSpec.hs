@@ -1,8 +1,8 @@
 {-# LANGUAGE ImportQualifiedPost #-}
-{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Spec.NominalCaseSpec (
     specs,
@@ -11,88 +11,44 @@ module Spec.NominalCaseSpec (
 import Cooked (InitialDistribution (..), Wallet, distributionFromList, interpretAndRunWith, printCooked, runMockChain, testSucceeds, testSucceedsFrom, wallet)
 import Test.Tasty
 
-import Test.Tasty.QuickCheck
+import Test.Tasty.QuickCheck (
+    Gen,
+    Property,
+    QuickCheckTests (QuickCheckTests),
+    chooseInteger,
+    elements,
+    forAll,
+    testProperty,
+    vector,
+ )
 
+import Adapter.CardanoCryptoClass.Crypto (ContextDSIGN, DSIGNAlgorithm (Signable), KeyPair)
 import Control.Monad.IO.Class
-import Cooked.ValueUtils
+import Cooked.ValueUtils (ada)
+import Data.Aeson (decodeFileStrict)
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
-import Data.Default
-import Data.String
-import OffChain.Actions
-import PlutusLedgerApi.V3
+import Data.Default (Default (def))
+import Data.String (IsString (fromString))
+import Fixture.Register
+import OffChain.Actions (ENNFT, NFT (..), register)
+import PlutusLedgerApi.V3 (
+    CurrencySymbol (CurrencySymbol),
+    TokenName (TokenName),
+    Value,
+    singleton,
+    toBuiltin,
+ )
 
-instance Show InitialDistribution where
-    show (InitialDistribution xs) = "InitialDistribution : " -- ++ show xs
-
-data FixtureNominalCase = FixtureNominalCase
-    { genesis :: InitialDistribution
-    , partnerChainSettings :: PartnerChainValidatorSettings
-    , ennft :: ENNFT
-    }
-    deriving (Show)
-
-nftToValue :: NFT -> Value
-nftToValue NFT{..} = singleton currencySymbol tokenName 1
-
-operator :: Wallet
-operator = wallet 1
-
-genFixtureNominalCase :: Gen FixtureNominalCase
-genFixtureNominalCase = do
-    ennft <- anyENNFT
-    anyPartnerChainSettings <- anyPartnerChainValidatorSettings
-    pure
-        FixtureNominalCase
-            { genesis =
-                distributionFromList
-                    [
-                        ( operator
-                        ,
-                            [ ada 100
-                            , ada 5
-                            , ada 5
-                            , ada 5
-                            , ada 5
-                            , ada 2 <> nftToValue ennft
-                            ]
-                        )
-                    ]
-            , partnerChainSettings = anyPartnerChainSettings
-            , ennft = ennft
-            }
-
-anyPartnerChainValidatorSettings :: Gen PartnerChainValidatorSettings
-anyPartnerChainValidatorSettings = do
-    ayaValidatorPublicKey <- fmap toBuiltin $ genByteStringOf 28
-    commission <- arbitrary
-    pure PartnerChainValidatorSettings{..}
-
-anyCurrencySymbol :: Gen CurrencySymbol
-anyCurrencySymbol =
-    CurrencySymbol
-        <$> fmap toBuiltin (genByteStringOf 28)
-
-genByteStringOf :: Int -> Gen ByteString
-genByteStringOf n =
-    BS.pack <$> vector n
-
-anyENNFTTokenName :: Gen TokenName
-anyENNFTTokenName = TokenName . fromString . show <$> chooseInteger (1, 1_0000)
-
-anyENNFT :: Gen ENNFT
-anyENNFT = NFT <$> anyCurrencySymbol <*> anyENNFTTokenName
-
-specs :: TestTree
-specs =
-    localOption (QuickCheckTests 30) $
-        testGroup
-            "Nominal Cases"
-            [ testProperty "Operators Can Register by Providing an ENNFT and Retrieving an ENOPNFT" $
-                forAll genFixtureNominalCase $
-                    \FixtureNominalCase{..} ->
-                        testSucceedsFrom @Property
-                            def
-                            genesis
-                            $ register partnerChainSettings ennft operator
-            ]
+specs :: (ContextDSIGN a ~ (), DSIGNAlgorithm a, Signable a ByteString) => [KeyPair a] -> TestTree
+specs keys =
+    testGroup
+        "Nominal Cases"
+        [ testProperty "Operators Can Register by Providing an ENNFT and Retrieving an ENOPNFT" $
+            forAll (genFixtureNominalCase keys) $
+                \FixtureNominalCase{..} ->
+                    testSucceedsFrom @Property
+                        def
+                        genesis
+                        $ register substrateKeyPair ennft commission operator
+        ]

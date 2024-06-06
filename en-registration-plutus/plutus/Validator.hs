@@ -27,6 +27,7 @@ module Validator (
     untypedValidator,
     validator,
     checkRegistrationSignature,
+    mkHashedRegistrationMessage,
     ENNFTCurrencySymbol (..),
     RegistrationDatum (..),
     RegistrationAction (..),
@@ -93,15 +94,15 @@ PlutusTx.makeLift ''RegistrationDatum
 -- {-# INLINABLE checkDatumSig #-}
 -- Check the signature of the registration datum
 checkRegistrationSignature :: RegistrationDatum -> Bool
-checkRegistrationSignature registrationDatum@RegistrationDatum{..} =
-    Cryptography.verifySchnorrSecp256k1Signature
+checkRegistrationSignature RegistrationDatum{..} =
+    Cryptography.verifyEd25519Signature
         ayaValidatorPublicKey
-        (mkHashedRegistrationMessage registrationDatum)
+        (mkHashedRegistrationMessage ennftTokenName cardanoRewardPubKey commission enopNFTCurrencySymbol)
         signature
 
 {-# INLINEABLE mkHashedRegistrationMessage #-}
-mkHashedRegistrationMessage :: RegistrationDatum -> BuiltinByteString
-mkHashedRegistrationMessage RegistrationDatum{..} =
+mkHashedRegistrationMessage :: TokenName -> PubKeyHash -> Integer -> CurrencySymbol -> BuiltinByteString
+mkHashedRegistrationMessage ennftTokenName cardanoRewardPubKey commission enopNFTCurrencySymbol =
     Cryptography.blake2b_256
         . appendByteString (unTokenName ennftTokenName)
         . appendByteString (getPubKeyHash cardanoRewardPubKey)
