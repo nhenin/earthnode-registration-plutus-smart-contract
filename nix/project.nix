@@ -18,6 +18,12 @@ let
       };
       modules = [{
         packages = {
+          assignment.preCheck = "
+        export CARDANO_CLI=${inputs.cardano-node.legacyPackages.cardano-cli}/bin/cardano-cli${pkgs.stdenv.hostPlatform.extensions.executable}
+        export CARDANO_NODE=${inputs.cardano-node.legacyPackages.cardano-node}/bin/cardano-node${pkgs.stdenv.hostPlatform.extensions.executable}
+        export CARDANO_SUBMIT_API=${inputs.cardano-node.legacyPackages.cardano-submit-api}/bin/cardano-submit-api${pkgs.stdenv.hostPlatform.extensions.executable}
+        export CARDANO_NODE_SRC=${../.}
+      ";
           en-registration.ghcOptions = [ "-Werror" ];
         };
       }];

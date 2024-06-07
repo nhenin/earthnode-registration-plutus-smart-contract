@@ -1,4 +1,16 @@
+### Haskell ###
 dist-newstyle
 .pre-commit-config.yaml
 cabal.project.freeze
 result
+cabal.project.local
+cabal.project.local~
+.ghc.environment.*
+## vi
+*.swp
+### direnv ###
+.direnv
+.envrc
+## local tests ##
+var/
+# End of https://www.toptal.com/developers/gitignore/api/haskell
