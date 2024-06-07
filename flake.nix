@@ -27,6 +27,14 @@
       url = "github:input-output-hk/haskell.nix";
       inputs.hackage.follows = "hackage";
     };
+    cardano-node.url = "github:intersectmbo/cardano-node?ref=8.9.3";
+
+    cardano-cli = {
+      url = "github:intersectmbo/cardano-cli?ref=cardano-cli-8.16.0.1";
+    };
+
+    mithril.url = "github:input-output-hk/mithril";
+
   };
 
 
