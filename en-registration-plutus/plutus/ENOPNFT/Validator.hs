@@ -24,7 +24,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 -- Options
 {-# OPTIONS_GHC -Wno-orphans #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:conservative-optimisation #-}
+
+{-# HLINT ignore "Use second" #-}
 
 module ENOPNFT.Validator (
     untypedValidator,
@@ -33,6 +36,7 @@ module ENOPNFT.Validator (
     Action (..),
     wVal,
     validateUnregister,
+    getHumanReadable,
 ) where
 
 import PlutusTx
@@ -50,6 +54,19 @@ import PlutusLedgerApi.V3
 import PlutusLedgerApi.V3.Contexts (ownCurrencySymbol, valuePaidTo)
 import PlutusTx.AssocMap qualified as Map
 import Validator (RegistrationDatum, checkRegistrationSignature)
+
+data Quantity = Zero | One | MoreThanOne
+    deriving (Prelude.Show)
+
+instance Eq Quantity where
+    {-# INLINEABLE (==) #-}
+    Zero == Zero = True
+    One == One = True
+    MoreThanOne == MoreThanOne = True
+    _ == _ = False
+
+PlutusTx.unstableMakeIsData ''Quantity
+PlutusTx.makeLift ''Quantity
 
 data MonetaryPolicySettings = MonetaryPolicySettings
     { ennftCurrencySymbol :: CurrencySymbol
@@ -80,9 +97,63 @@ instance Eq Action where
 PlutusTx.makeIsDataIndexed ''Action [('Mint, 0), ('Burn, 1)]
 PlutusTx.makeLift ''Action
 
-{-- validateUnregister --}
--- Checks if the ENOP-NFT is burnt.
--- We check that the CurrencySymbol of the token is the one of this minting policy
+{-# INLINEABLE getHumanReadable #-}
+
+{- | Get the human readable representation on an Error Message Onchain
+| N.B : This function should be used only for OffChain Logic, It has a double purpose :
+| 1. To provide a human readable error message to the user for OffChain Logic
+| 2. To provide direct documentation on the OnChain Logic
+-}
+getHumanReadable :: BuiltinString -> BuiltinString
+getHumanReadable =
+    \case
+        -- Property 1 : Earth Node being NFT implies ENOP Token Minted is also A Non Fungible Token
+        -- Property 1.0 : Quantities are preserved when Minting ENOP Tokens
+        "1.0.0" -> "Property. 1.0.0 violation - ENOPNFT TokenName =/ ENNFT TokenName"
+        "1.0.1" -> "Property. 1.0.1 violation - ENNOP's Minted Quantity > 1"
+        "1.0.2" -> "Property. 1.0.2 violation - ENNOP's Minted Quantity == 0"
+        "1.0.3" -> "Property. 1.0.3 violation - ENNFT 's Minted Quantity > 1"
+        "1.0.4" -> "Property. 1.0.4 violation - No ENNFT on Registration validator output"
+        -- Property 1.1 : Quantities are preserved when Burning ENOP Tokens
+        -- TODO
+        -- Property 2 : ENOP NFT should be minted only to the operator
+        "2.0" -> "Property. 2 violation - ENNOP Minted Not Output to Operator"
+        -- Property 3 : Only the operator should sign the transaction
+        "3.0" -> "Property. 3 violation - No signer found"
+        "3.1" -> "Property. 3 violation - signer is not unique"
+        -- Property 4 : The registration Datum should be verifiable
+        "4.0" -> "Property. 4 violation - Registration datum is not valid"
+        "4.1" -> "Property. 4 violation - Registration validator output not found"
+        "4.2" -> "Property. 4 violation - Registration validator output has no datum"
+        "4.3" -> "Property. 4 violation - Registration validator output has only the hashed datum"
+        "4.4" -> "Property. 4 violation - More than one Registration validator output is not allowed"
+        _ -> "unknown error code"
+
+{-# INLINEABLE prop_1_0_0_enopAndEnNFTWithDifferentName #-}
+{-# INLINEABLE prop_1_0_1_enopNFTQuantityMintedAboveOne #-}
+{-# INLINEABLE prop_1_0_2_enopNFTQuantityMintedEqualNone #-}
+{-# INLINEABLE prop_1_0_3_enNFTQuantityMintedAboveOne #-}
+{-# INLINEABLE prop_1_0_4_NoENNFTRegisteredOnScript #-}
+prop_1_0_0_enopAndEnNFTWithDifferentName
+    , prop_1_0_1_enopNFTQuantityMintedAboveOne
+    , prop_1_0_2_enopNFTQuantityMintedEqualNone
+    , prop_1_0_3_enNFTQuantityMintedAboveOne
+    , prop_1_0_4_NoENNFTRegisteredOnScript ::
+        BuiltinString
+prop_1_0_0_enopAndEnNFTWithDifferentName = "1.0.0"
+prop_1_0_1_enopNFTQuantityMintedAboveOne = "1.0.1"
+prop_1_0_2_enopNFTQuantityMintedEqualNone = "1.0.2"
+prop_1_0_3_enNFTQuantityMintedAboveOne = "1.0.3"
+prop_1_0_4_NoENNFTRegisteredOnScript = "1.0.4"
+
+{-# INLINEABLE propertyViolation #-}
+propertyViolation :: BuiltinString -> a
+propertyViolation = traceError
+
+{-# INLINEABLE propertyViolationIfFalse #-}
+propertyViolationIfFalse :: BuiltinString -> Bool -> Bool
+propertyViolationIfFalse = traceIfFalse
+
 {-# INLINEABLE validateUnregister #-}
 validateUnregister :: CurrencySymbol -> TxInfo -> Bool
 validateUnregister ocs info
@@ -95,7 +166,7 @@ validateUnregister ocs info
 enOpBurnt :: CurrencySymbol -> Value -> TxInfo -> Bool
 enOpBurnt cs v info =
     let
-        tn = getTokenName (txInfoInputs info) cs
+        tn = getTokenName' (txInfoInputs info) cs
         burn_amt = case tn of
             Just tn' -> valueOf v cs tn'
             Nothing -> 0
@@ -112,53 +183,87 @@ enOpBurnt cs v info =
 canMintENOPNFT :: MonetaryPolicySettings -> CurrencySymbol -> TxInfo -> Bool
 canMintENOPNFT monetaryPolicySettings enopNFTCurrencySymbol txInfo =
     ( \(scriptDatum, scriptValue) ->
-        let enopTokenName = getENOPNFTTokenName enopNFTCurrencySymbol txInfo
-            ennftTokenName = getENNFTTokenName monetaryPolicySettings scriptValue
-         in traceIfFalse "Can't Mint ENNOP - ENOPNFT and ENNFT TokenNames are not equal" (enopTokenName == ennftTokenName)
-                && traceIfFalse "Can't Mint ENNOP - ENNOP Minted Not Output to Operator" (isENOPNFTGivenToOperator txInfo enopNFTCurrencySymbol)
-                && traceIfFalse "Can't Mint ENNOP - Registration Signature Verification Failed" (checkRegistrationSignature scriptDatum)
+        let enopTokenName =
+                getNFTTokenName
+                    ( prop_1_0_2_enopNFTQuantityMintedEqualNone
+                    , prop_1_0_1_enopNFTQuantityMintedAboveOne
+                    )
+                    enopNFTCurrencySymbol
+                    (txInfoMint txInfo)
+            ennftTokenName =
+                getNFTTokenName
+                    ( prop_1_0_4_NoENNFTRegisteredOnScript
+                    , prop_1_0_3_enNFTQuantityMintedAboveOne
+                    )
+                    (ennftCurrencySymbol monetaryPolicySettings)
+                    scriptValue
+         in propertyViolationIfFalse
+                prop_1_0_0_enopAndEnNFTWithDifferentName
+                (enopTokenName == ennftTokenName)
+                && isENOPNFTGivenToOperator enopNFTCurrencySymbol txInfo
+                && checkRegistrationSignature scriptDatum
     )
         $ getScriptDatumAndValueSpent monetaryPolicySettings txInfo
 
 {-# INLINEABLE isENOPNFTGivenToOperator #-}
-isENOPNFTGivenToOperator :: TxInfo -> CurrencySymbol -> Bool
-isENOPNFTGivenToOperator txInfo enopNFTCurrencySymbol =
+isENOPNFTGivenToOperator :: CurrencySymbol -> TxInfo -> Bool
+isENOPNFTGivenToOperator enopNFTCurrencySymbol =
     \case
-        [_] -> True
-        [] -> traceError "Can't Mint ENNOP - No ENNOP minted in transaction"
-        _ -> traceError "Can't Mint ENNOP - More than one ENNOP minted"
-        $ getNFTTokenNames enopNFTCurrencySymbol (valuePaidTo txInfo . getUniqueSigner $ txInfo)
+        (_, Zero) -> propertyViolation prop_1_0_2_enopNFTQuantityMintedEqualNone
+        (_, One) -> True
+        (_, MoreThanOne) -> propertyViolation prop_1_0_3_enNFTQuantityMintedAboveOne
+        . getUniqueTokenNameAndQuantity enopNFTCurrencySymbol
+        . getValuePaidByUniqueSigner
+
+{-# INLINEABLE getValuePaidByUniqueSigner #-}
+getValuePaidByUniqueSigner :: TxInfo -> Value
+getValuePaidByUniqueSigner txInfo =
+    valuePaidTo txInfo
+        . getUniqueSigner
+        $ txInfo -- equivalent could be `valuePaidTo <*> getUniqueSigner` but Applicative (->) doesn't exist in PlutusTx
 
 {-# INLINEABLE getUniqueSigner #-}
 getUniqueSigner :: TxInfo -> PubKeyHash
-getUniqueSigner txInfo =
+getUniqueSigner =
     \case
         [pkh] -> pkh
-        [] -> traceError "Can't Mint ENNOP - No unique signer found"
-        _ -> traceError "Can't Mint ENNOP - More than one unique signer found"
-        $ txInfoSignatories txInfo
+        [] -> traceError "3"
+        _ -> traceError "4"
+        . txInfoSignatories
 
-{-# INLINEABLE getENOPNFTTokenName #-}
-getENOPNFTTokenName :: CurrencySymbol -> TxInfo -> TokenName
-getENOPNFTTokenName enopNFTCurrencySymbol txInfo =
+{-# INLINEABLE getNFTTokenName #-}
+getNFTTokenName :: (BuiltinString, BuiltinString) -> CurrencySymbol -> Value -> TokenName
+getNFTTokenName (quantityZero, quantityMoreThanOne) enopNFTCurrencySymbol =
     \case
-        [tn] -> tn
-        [] -> traceError "Can't Mint ENNOP - No ENNOP minted in transaction"
-        _ -> traceError "Can't Mint ENNOP - More than one ENNOP minted"
-        $ getNFTTokenNames enopNFTCurrencySymbol (txInfoMint txInfo)
+        (_, Zero) -> propertyViolation quantityZero
+        (tn, One) -> tn
+        (_, MoreThanOne) -> propertyViolation quantityMoreThanOne
+        . getUniqueTokenNameAndQuantity enopNFTCurrencySymbol
 
-{-# INLINEABLE getNFTTokenNames #-}
-getNFTTokenNames :: CurrencySymbol -> Value -> [TokenName]
-getNFTTokenNames c (Value v) = maybe [] Map.keys (Map.lookup c v)
-
-{-# INLINEABLE getENNFTTokenName #-}
-getENNFTTokenName :: MonetaryPolicySettings -> Value -> TokenName
-getENNFTTokenName MonetaryPolicySettings{ennftCurrencySymbol} value =
+{-# INLINEABLE getUniqueTokenNameAndQuantity #-}
+getUniqueTokenNameAndQuantity :: CurrencySymbol -> Value -> (TokenName, Quantity)
+getUniqueTokenNameAndQuantity c =
     \case
-        [tn] -> tn
-        [] -> traceError "Can't Mint ENNOP - No ENNFT on Registration validator output"
-        _ -> traceError "Can't Mint ENNOP - More than one ENNFT present"
-        $ getNFTTokenNames ennftCurrencySymbol value
+        [] -> propertyViolation prop_1_0_2_enopNFTQuantityMintedEqualNone
+        [(tn, quantity)] -> (tn, quantity)
+        _ -> propertyViolation prop_1_0_1_enopNFTQuantityMintedAboveOne
+        . getTokenNamesAndQuantities c
+
+{-# INLINEABLE getTokenNamesAndQuantities #-}
+getTokenNamesAndQuantities :: CurrencySymbol -> Value -> [(TokenName, Quantity)]
+getTokenNamesAndQuantities c (Value v) =
+    maybe
+        []
+        (((\(tn, i) -> (tn, convertToQuantity i)) <$>) . Map.toList)
+        (Map.lookup c v)
+
+{-# INLINEABLE convertToQuantity #-}
+convertToQuantity :: Integer -> Quantity
+convertToQuantity x
+    | 0 == x = Zero
+    | 1 == x = One
+    | 1 > x = MoreThanOne
+    | otherwise = propertyViolation "Negative quantity"
 
 {-# INLINEABLE getScriptDatumAndValueSpent #-}
 getScriptDatumAndValueSpent :: MonetaryPolicySettings -> TxInfo -> (RegistrationDatum, Value)
@@ -166,20 +271,20 @@ getScriptDatumAndValueSpent MonetaryPolicySettings{registrationValidatorHash} tx
     \case
         [(OutputDatum (Datum scriptDatum), scriptValue)] ->
             case fromBuiltinData scriptDatum of
-                Nothing -> traceError "Can't Mint ENNOP - Registration datum is not valid"
+                Nothing -> propertyViolation prop_1_0_4_NoENNFTRegisteredOnScript
                 Just registrationDatum -> (registrationDatum, scriptValue)
-        [] -> traceError "Can't Mint ENNOP - Registration validator output not found"
-        [(NoOutputDatum, _)] -> traceError "Can't Mint ENNOP - Registration validator output has no datum"
-        [(OutputDatumHash _, _)] -> traceError "Can't Mint ENNOP - Registration validator output has only the hashed datum"
-        _ : _ -> traceError "Can't Mint ENNOP - More than one Registration validator output is not allowed"
+        [] -> traceError "11"
+        [(NoOutputDatum, _)] -> traceError "12"
+        [(OutputDatumHash _, _)] -> traceError "13"
+        _ : _ -> traceError "14"
         $ scriptOutputsAt registrationValidatorHash txInfo
 
 {-- getTokenName --}
 -- We determine the TokenName from the input of the registration smart contract,
 -- we know it must be exactly one available which must have the same tokenname as the ENOOPNFT
-{-# INLINEABLE getTokenName #-}
-getTokenName :: [TxInInfo] -> CurrencySymbol -> Maybe TokenName
-getTokenName is cs =
+{-# INLINEABLE getTokenName' #-}
+getTokenName' :: [TxInInfo] -> CurrencySymbol -> Maybe TokenName
+getTokenName' is cs =
     let
         filter' :: TxInInfo -> [Maybe TokenName]
         filter' i = fn $ flattenValue (txOutValue $ txInInfoResolved i)

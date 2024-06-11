@@ -1,3 +1,4 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -6,18 +7,24 @@
 module Fixture.Register (
     FixtureNominalCase (..),
     genFixtureNominalCase,
+    FixtureFailureCaseDifferentTokenNames (..),
+    genFixtureFailureCaseDifferentTokenNames,
     operator,
+    anotherOperator,
 ) where
 
 import Cooked (InitialDistribution (..), Wallet, distributionFromList, interpretAndRunWith, printCooked, runMockChain, testSucceeds, testSucceedsFrom, wallet)
 
 import Test.Tasty.QuickCheck (
+    Arbitrary (arbitrary),
     Gen,
     Property,
     QuickCheckTests (QuickCheckTests),
     chooseInteger,
     elements,
     forAll,
+    listOf1,
+    suchThat,
     testProperty,
     vector,
  )
@@ -50,16 +57,29 @@ data FixtureNominalCase a = FixtureNominalCase
     }
     deriving (Show)
 
+data FixtureFailureCaseDifferentTokenNames a = FixtureFailureCaseDifferentTokenNames
+    { genesis :: InitialDistribution
+    , substrateKeyPair :: KeyPair a
+    , commission :: Integer
+    , ennft :: ENNFT
+    , enopNFTTokenNames :: [TokenName]
+    }
+    deriving (Show)
+
 nftToValue :: NFT -> Value
 nftToValue NFT{..} = singleton currencySymbol tokenName 1
 
 operator :: Wallet
 operator = wallet 1
 
+anotherOperator :: Wallet
+anotherOperator = wallet 2
+
 genFixtureNominalCase :: [KeyPair a] -> Gen (FixtureNominalCase a)
 genFixtureNominalCase keypairs = do
     substrateKeyPair <- elements keypairs
     ennft <- anyENNFT
+
     commission <- chooseInteger (0, 100)
     pure
         FixtureNominalCase
@@ -82,6 +102,34 @@ genFixtureNominalCase keypairs = do
             , ennft = ennft
             }
 
+genFixtureFailureCaseDifferentTokenNames :: [KeyPair a] -> Gen (FixtureFailureCaseDifferentTokenNames a)
+genFixtureFailureCaseDifferentTokenNames keypairs = do
+    substrateKeyPair <- elements keypairs
+    ennft <- anyENNFT
+    enopNFTTokenNames <- anyENNFTTokenNames `suchThat` (notElem . tokenName $ ennft)
+    commission <- chooseInteger (0, 100)
+    pure
+        FixtureFailureCaseDifferentTokenNames
+            { genesis =
+                distributionFromList
+                    [
+                        ( operator
+                        ,
+                            [ ada 100
+                            , ada 5
+                            , ada 5
+                            , ada 5
+                            , ada 5
+                            , ada 2 <> nftToValue ennft
+                            ]
+                        )
+                    ]
+            , substrateKeyPair = substrateKeyPair
+            , commission = commission
+            , ennft = ennft
+            , enopNFTTokenNames = enopNFTTokenNames
+            }
+
 anyCurrencySymbol :: Gen CurrencySymbol
 anyCurrencySymbol =
     CurrencySymbol
@@ -93,6 +141,9 @@ genByteStringOf n =
 
 anyENNFTTokenName :: Gen TokenName
 anyENNFTTokenName = TokenName . fromString . show <$> chooseInteger (1, 1_0000)
+
+anyENNFTTokenNames :: Gen [TokenName]
+anyENNFTTokenNames = listOf1 (TokenName . fromString . show <$> chooseInteger (1, 1_0000))
 
 anyENNFT :: Gen ENNFT
 anyENNFT = NFT <$> anyCurrencySymbol <*> anyENNFTTokenName

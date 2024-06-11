@@ -48,7 +48,7 @@ test-suite en-registration-unit-tests
     Adapter.CardanoCryptoClass.Crypto
     Fixture.Register
     OffChain.Actions
-    Spec.NominalCaseSpec
+    Spec.RegisterSpec
 
   build-depends:
     , aeson
@@ -63,8 +63,10 @@ test-suite en-registration-unit-tests
     , en-registration-plutus
     , hex-text
     , nonempty-containers
+    , plutus-ledger
     , plutus-ledger-api
     , plutus-script-utils
+    , plutus-tx
     , tasty
     , tasty-hunit
     , tasty-quickcheck
