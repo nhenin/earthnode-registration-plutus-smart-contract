@@ -6,7 +6,7 @@ module Main (
 ) where
 
 import GHC.IO.Encoding (setLocaleEncoding, utf8)
-import qualified Spec.NominalCaseSpec as Validator.NominalCases
+import qualified Spec.RegisterSpec as Register
 import Test.Tasty (defaultMain, testGroup)
 
 import Cardano.Crypto.DSIGN
@@ -35,7 +35,7 @@ main = do
             "Validator Registration Plutus Contract - Unit Tests"
             [ testGroup
                 "On Chain"
-                [ Validator.NominalCases.specs keys
+                [ Register.specs keys
                 ]
             , testGroup
                 "Off Chain"
