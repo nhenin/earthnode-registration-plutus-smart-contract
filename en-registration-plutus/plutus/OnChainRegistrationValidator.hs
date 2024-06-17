@@ -23,9 +23,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:conservative-optimisation #-}
 
-module Validator (
-    untypedValidator,
-    validator,
+module OnChainRegistrationValidator (
+    mkUntypedValidatorFunction,
+    mkValidatorFunction,
     checkRegistrationSignature,
     mkHashedRegistrationMessage,
     ENNFTCurrencySymbol (..),
@@ -43,7 +43,13 @@ import Prelude qualified
 
 import PlutusTx.Builtins qualified as Cryptography
 
-import Plutus.Script.Utils.V3.Contexts
+import Plutus.Script.Utils.V3.Contexts (
+    findOwnInput,
+    ownHash,
+    scriptOutputsAt,
+    valueProduced,
+    valueSpent,
+ )
 
 newtype ENNFTCurrencySymbol = ENNFTCurrencySymbol
     { ennftCurrencySymbol :: CurrencySymbol
@@ -126,9 +132,9 @@ PlutusTx.makeLift ''RegistrationAction
 -- ENOs can update the registration information, for that the signature of the current and the new datum is checked
 -- it is also checked if the correct ENOP-NFT is spent in this transaction.
 -- is must be ensured that the enUsedNftTn and pEnOpCs never change, this can only be done by performing a new registration
-{-# INLINEABLE updateRegistration #-}
-updateRegistration :: ENNFTCurrencySymbol -> BuiltinByteString -> ScriptContext -> Bool
-updateRegistration ENNFTCurrencySymbol{..} _ ctx
+{-# INLINEABLE canUpdateRegistration #-}
+canUpdateRegistration :: ENNFTCurrencySymbol -> BuiltinByteString -> ScriptContext -> Bool
+canUpdateRegistration ENNFTCurrencySymbol{..} _ ctx
     -- \| checkDatumSig nDat, -- new datum signature is verifued
     -- checkDatumSig cDat, -- old datum signature is verified
     -- newDatumSigned, -- signature check of new datum by old key
@@ -193,9 +199,9 @@ updateRegistration ENNFTCurrencySymbol{..} _ ctx
 
     info = scriptContextTxInfo ctx
 
-{-# INLINEABLE validateUnregister #-}
-validateUnregister :: ENNFTCurrencySymbol -> RegistrationDatum -> ScriptContext -> Bool
-validateUnregister ENNFTCurrencySymbol{..} RegistrationDatum{..} ctx
+{-# INLINEABLE canUnregister #-}
+canUnregister :: ENNFTCurrencySymbol -> RegistrationDatum -> ScriptContext -> Bool
+canUnregister ENNFTCurrencySymbol{..} RegistrationDatum{..} ctx
     -- No UTxO's to the script are allowed
     | noScriptOutputs $ txInfoOutputs info
     , -- the ENOPNFT must be burnt in this transaction
@@ -220,24 +226,18 @@ validateUnregister ENNFTCurrencySymbol{..} RegistrationDatum{..} ctx
          in
             checkInput h && noScriptOutputs t
 
-{-# INLINEABLE validator #-}
-validator :: ENNFTCurrencySymbol -> RegistrationDatum -> RegistrationAction -> ScriptContext -> Bool
-validator sp d Unregister ctx = validateUnregister sp d ctx
-validator sp _ (Update bs) ctx = updateRegistration sp bs ctx
+{-# INLINEABLE mkValidatorFunction #-}
+mkValidatorFunction :: ENNFTCurrencySymbol -> RegistrationDatum -> RegistrationAction -> ScriptContext -> Bool
+mkValidatorFunction sp d Unregister ctx = canUnregister sp d ctx
+mkValidatorFunction sp _ (Update bs) ctx = canUpdateRegistration sp bs ctx
 
-{-# INLINEABLE untypedValidator #-}
-untypedValidator :: BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> ()
-untypedValidator s d r c =
-    wVal validator (unsafeFromBuiltinData s) (unsafeFromBuiltinData d) (unsafeFromBuiltinData r) (unsafeFromBuiltinData c)
-
-{-# INLINEABLE wVal #-}
-wVal ::
-    forall s d r c.
-    (UnsafeFromData s, UnsafeFromData d, UnsafeFromData r, UnsafeFromData c) =>
-    (s -> d -> r -> c -> Bool) ->
-    BuiltinData ->
-    BuiltinData ->
-    BuiltinData ->
-    BuiltinData ->
-    ()
-wVal f s d r c = check (f (unsafeFromBuiltinData s) (unsafeFromBuiltinData d) (unsafeFromBuiltinData r) (unsafeFromBuiltinData c))
+{-# INLINEABLE mkUntypedValidatorFunction #-}
+mkUntypedValidatorFunction :: ENNFTCurrencySymbol -> BuiltinData -> BuiltinData -> BuiltinData -> ()
+mkUntypedValidatorFunction s d r c =
+    check
+        ( mkValidatorFunction
+            s
+            (unsafeFromBuiltinData d)
+            (unsafeFromBuiltinData r)
+            (unsafeFromBuiltinData c)
+        )

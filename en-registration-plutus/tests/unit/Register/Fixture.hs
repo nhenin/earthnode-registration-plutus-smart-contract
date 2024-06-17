@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Fixture.Register (
+module Register.Fixture (
     FixtureNominalCase (..),
     genFixtureNominalCase,
     FixtureENNFTWithWrongQuantityAbove1 (..),
@@ -47,7 +47,9 @@ import Data.Default (Default (def))
 import Data.Foldable (Foldable (..))
 import Data.List.NonEmpty qualified as NL
 import Data.String (IsString (fromString))
-import OffChain.Register (ENNFT, NFT (..), register)
+
+import Model
+import OnChainRegistrationValidator
 import PlutusLedgerApi.V3 (
     CurrencySymbol (CurrencySymbol),
     TokenName (TokenName),
@@ -56,11 +58,10 @@ import PlutusLedgerApi.V3 (
     singleton,
     toBuiltin,
  )
-import Script
-import Validator
+import RegistrationValidator
 
 instance Show InitialDistribution where
-    show (InitialDistribution xs) = "InitialDistribution : " -- ++ show xs
+    show (InitialDistribution xs) = "InitialDistribution : " ++ show xs
 
 data FixtureNominalCase a = FixtureNominalCase
     { genesis :: InitialDistribution

@@ -26,9 +26,10 @@ library
   exposed-modules:
     Adapter.Plutus
     ENOPNFT.MonetaryPolicy
-    ENOPNFT.Validator
-    Script
-    Validator
+    ENOPNFT.OnChainMonetaryPolicy
+    OnChainRegistrationValidator
+    RegistrationValidator
+    Specifications
 
   build-depends:
     , aeson
@@ -46,9 +47,11 @@ test-suite en-registration-unit-tests
   main-is:            Main.hs
   other-modules:
     Adapter.CardanoCryptoClass.Crypto
-    Fixture.Register
-    OffChain.Register
-    Spec.RegisterSpec
+    Model
+    Register.Fixture
+    Register.Spec
+    Register.TxBuilding
+    Update.TxBuilding
 
   build-depends:
     , aeson
