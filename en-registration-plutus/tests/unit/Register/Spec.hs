@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Spec.RegisterSpec (
+module Register.Spec (
     specs,
 ) where
 
@@ -23,9 +23,7 @@ import Data.Default (Default (def))
 import Data.List.NonEmpty qualified as NL
 import Data.String (IsString (fromString))
 import Data.Text (Text)
-import Fixture.Register
 import Ledger qualified
-import OffChain.Register (ENNFT, NFT (..), mintWithoutRegistrationScript, register, registerAndMintToAnotherOperator, registerByGeneratingMoreThan1ENNFT, registerByGeneratingMoreThan1ENOPNFT, registerMintingAnENOPWithQuantityAbove1, registerMoreThanOneOperator, registerWith2WalletsSigning, registerWithDifferentENandENOPNFTTokenNames, registerWithHashedRegistrationDatum, registerWithInvalidDatumVerification, registerWithNoRegistrationDatum, registerWithanENNFTWithAQuantityAbove1, registerWithoutAnENNFT, registerWithoutSigning)
 import PlutusLedgerApi.V3 (
     CurrencySymbol (CurrencySymbol),
     TokenName (TokenName),
@@ -33,6 +31,56 @@ import PlutusLedgerApi.V3 (
     singleton,
     toBuiltin,
  )
+import Register.Fixture (
+    FixtureENNFTWithWrongQuantityAbove1 (
+        FixtureENNFTWithWrongQuantityAbove1,
+        commission,
+        ennft,
+        genesis,
+        substrateKeyPair,
+        wrongENNFTQuantity
+    ),
+    FixtureFailureCaseDifferentTokenNames (
+        FixtureFailureCaseDifferentTokenNames,
+        commission,
+        ennft,
+        enopNFTTokenNames,
+        genesis,
+        substrateKeyPair
+    ),
+    FixtureMultipleENNFTs (
+        FixtureMultipleENNFTs,
+        commission,
+        ennftCurrencySymbol,
+        ennftsTokenNames,
+        firstEnnftTn,
+        genesis,
+        substrateKeyPair
+    ),
+    FixtureNominalCase (
+        FixtureNominalCase,
+        commission,
+        ennft,
+        genesis,
+        substrateKeyPair
+    ),
+    FixtureWithInvalidSignature (
+        FixtureWithInvalidSignature,
+        commission,
+        ennft,
+        genesis,
+        invalidSignature,
+        substrateKeyPair
+    ),
+    anotherOperator,
+    genFixtureENNFTWithWrongQuantityAbove1,
+    genFixtureFailureCaseDifferentTokenNames,
+    genFixtureMultipleENNFTs,
+    genFixtureNominalCase,
+    genFixtureWithInvalidSignature,
+    operator,
+ )
+import Register.TxBuilding (mintWithoutRegistrationScript, register, registerAndMintToAnotherOperator, registerByGeneratingMoreThan1ENNFT, registerByGeneratingMoreThan1ENOPNFT, registerMintingAnENOPWithQuantityAbove1, registerMoreThanOneOperator, registerWith2WalletsSigning, registerWithDifferentENandENOPNFTTokenNames, registerWithHashedRegistrationDatum, registerWithInvalidDatumVerification, registerWithNoRegistrationDatum, registerWithanENNFTWithAQuantityAbove1, registerWithoutAnENNFT, registerWithoutSigning)
 import Test.Tasty.QuickCheck (
     Gen,
     Property,
@@ -50,7 +98,14 @@ specs keys =
         "Registration Specifications"
         [ testGroup
             "Nominal Cases"
-            [ testProperty "Nominal Case - Operators can register" $
+            [ testProperty "Register" $
+                forAll (genFixtureNominalCase keys) $
+                    \FixtureNominalCase{..} ->
+                        testSucceedsFrom @Property
+                            def
+                            genesis
+                            $ register substrateKeyPair ennft commission operator
+            , testProperty "Update" $
                 forAll (genFixtureNominalCase keys) $
                     \FixtureNominalCase{..} ->
                         testSucceedsFrom @Property

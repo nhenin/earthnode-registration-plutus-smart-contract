@@ -6,7 +6,7 @@ module Main (
 ) where
 
 import GHC.IO.Encoding (setLocaleEncoding, utf8)
-import qualified Spec.RegisterSpec as Register
+import qualified Register.Spec as Register
 import Test.Tasty (defaultMain, testGroup)
 
 import Cardano.Crypto.DSIGN

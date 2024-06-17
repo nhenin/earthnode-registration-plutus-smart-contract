@@ -1,17 +1,10 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ImportQualifiedPost #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
-module OffChain.Register (
-    ENNFT (..),
-    ENOPNFT (..),
-    NFT (..),
-    Commission,
+module Register.TxBuilding (
     register,
     -- Pushing Fungible Tokens instead of NFTs
     registerMintingAnENOPWithQuantityAbove1,
@@ -50,32 +43,27 @@ import PlutusTx.AssocMap qualified as PMap
 
 import Data.Set (Set)
 import Data.Set qualified as Set
-import ENOPNFT.Validator (Action (..))
+import ENOPNFT.OnChainMonetaryPolicy (Action (..))
 import Plutus.Script.Utils.Scripts qualified as Script
 
-import Adapter.CardanoCryptoClass.Crypto (Codec (decode, encode), DSIGNAlgorithm (..), Ed25519DSIGN, FromByteString (fromByteString), Hexadecimal, KeyPair (signatureKey, verificationKey), ToByteString (toByteString), sign)
+import Adapter.CardanoCryptoClass.Crypto
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.List.NonEmpty qualified as NL
 import Data.Text qualified as Text
+import Model
+import OnChainRegistrationValidator (ENNFTCurrencySymbol (..), RegistrationDatum (..), mkHashedRegistrationMessage)
 import PlutusLedgerApi.V1.Value qualified as Value
 import PlutusLedgerApi.V3 (BuiltinByteString, CurrencySymbol, PubKeyHash, TokenName, fromBuiltin, toBuiltin, toBuiltinData)
 import PlutusLedgerApi.V3 qualified as Api
 import PlutusLedgerApi.V3 qualified as V3
 import Prettyprinter.Extras (Pretty (..))
-import Script (
+import RegistrationValidator (
     associatedENOPNFTCurrencySymbol,
     associatedENOPNFTMonetaryPolicy,
-    typedScript,
+    typedRegistrationValidator,
  )
-import Validator (ENNFTCurrencySymbol (..), RegistrationDatum (..), mkHashedRegistrationMessage)
-
-data NFT = NFT {currencySymbol :: CurrencySymbol, tokenName :: TokenName} deriving (Eq, Show)
-type ENNFT = NFT
-type ENOPNFT = NFT
-type Commission = Integer
-type Quantity = Integer
 
 register ::
     (ContextDSIGN a ~ (), DSIGNAlgorithm a, Signable a ByteString) =>
@@ -112,7 +100,7 @@ register keyPair ennft commission operator = do
                         operator
                         (V3.singleton (associatedENOPNFTCurrencySymbol settings) (tokenName ennft) 1)
                     , paysScriptInlineDatum
-                        (typedScript settings)
+                        (typedRegistrationValidator settings)
                         ( RegistrationDatum
                             { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
                             , signature = toBuiltin signedMessage
@@ -165,7 +153,7 @@ registerMintingAnENOPWithQuantityAbove1 keyPair ennft commission operator = do
                         operator
                         (V3.singleton (associatedENOPNFTCurrencySymbol settings) (tokenName ennft) 2)
                     , paysScriptInlineDatum
-                        (typedScript settings)
+                        (typedRegistrationValidator settings)
                         ( RegistrationDatum
                             { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
                             , signature = toBuiltin signedMessage
@@ -215,7 +203,7 @@ registerWithoutAnENNFT keyPair ennft commission operator = do
                         operator
                         (V3.singleton (associatedENOPNFTCurrencySymbol settings) (tokenName ennft) 1)
                     , paysScriptInlineDatum
-                        (typedScript settings)
+                        (typedRegistrationValidator settings)
                         ( RegistrationDatum
                             { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
                             , signature = toBuiltin signedMessage
@@ -269,7 +257,7 @@ registerWithanENNFTWithAQuantityAbove1 keyPair ennft ennftQuantityAbove1 commiss
                         operator
                         (V3.singleton (associatedENOPNFTCurrencySymbol settings) (tokenName ennft) 1)
                     , paysScriptInlineDatum
-                        (typedScript settings)
+                        (typedRegistrationValidator settings)
                         ( RegistrationDatum
                             { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
                             , signature = toBuiltin signedMessage
@@ -322,7 +310,7 @@ registerByGeneratingMoreThan1ENNFT keyPair (ennftCurrencySymbol, firstEnnftTn, e
                         operator
                         (V3.singleton (associatedENOPNFTCurrencySymbol settings) firstEnnftTn 1)
                     , paysScriptInlineDatum
-                        (typedScript settings)
+                        (typedRegistrationValidator settings)
                         ( RegistrationDatum
                             { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
                             , signature = toBuiltin signedMessage
@@ -382,7 +370,7 @@ registerByGeneratingMoreThan1ENOPNFT keyPair ennft differentTokenNames commissio
                             (tokenName ennft : differentTokenNames)
                         )
                     , paysScriptInlineDatum
-                        (typedScript settings)
+                        (typedRegistrationValidator settings)
                         ( RegistrationDatum
                             { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
                             , signature = toBuiltin signedMessage
@@ -398,10 +386,6 @@ registerByGeneratingMoreThan1ENOPNFT keyPair ennft differentTokenNames commissio
     return $
         NFT (associatedENOPNFTCurrencySymbol settings)
             <$> (tokenName ennft : differentTokenNames)
-
--- | Make a 'Value' containing only the given quantity of the given currency.
-nfts :: CurrencySymbol -> [TokenName] -> V3.Value
-nfts c tns = V3.Value $ PMap.singleton c (PMap.fromList $ (,1) <$> tns)
 
 registerAndMintToAnotherOperator ::
     (ContextDSIGN a ~ (), DSIGNAlgorithm a, Signable a ByteString) =>
@@ -439,7 +423,7 @@ registerAndMintToAnotherOperator keyPair ennft commission operator anotherOperat
                         anotherOperator
                         (V3.singleton (associatedENOPNFTCurrencySymbol settings) (tokenName ennft) 1)
                     , paysScriptInlineDatum
-                        (typedScript settings)
+                        (typedRegistrationValidator settings)
                         ( RegistrationDatum
                             { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
                             , signature = toBuiltin signedMessage
@@ -493,7 +477,7 @@ registerWith2WalletsSigning keyPair ennft commission operator anotherWallet = do
                         operator
                         (V3.singleton (associatedENOPNFTCurrencySymbol settings) (tokenName ennft) 1)
                     , paysScriptInlineDatum
-                        (typedScript settings)
+                        (typedRegistrationValidator settings)
                         ( RegistrationDatum
                             { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
                             , signature = toBuiltin signedMessage
@@ -546,7 +530,7 @@ registerWithoutSigning keyPair ennft commission operator = do
                         operator
                         (V3.singleton (associatedENOPNFTCurrencySymbol settings) (tokenName ennft) 1)
                     , paysScriptInlineDatum
-                        (typedScript settings)
+                        (typedRegistrationValidator settings)
                         ( RegistrationDatum
                             { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
                             , signature = toBuiltin signedMessage
@@ -600,7 +584,7 @@ registerWithDifferentENandENOPNFTTokenNames keyPair ennft enoptTokenName commiss
                         wallet
                         (V3.singleton (associatedENOPNFTCurrencySymbol settings) enoptTokenName 1)
                     , paysScriptInlineDatum
-                        (typedScript settings)
+                        (typedRegistrationValidator settings)
                         ( RegistrationDatum
                             { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
                             , signature = toBuiltin signedMessage
@@ -644,7 +628,7 @@ registerWithInvalidDatumVerification keyPair ennft commission operator invalidSi
                         operator
                         (V3.singleton (associatedENOPNFTCurrencySymbol settings) (tokenName ennft) 1)
                     , paysScriptInlineDatum
-                        (typedScript settings)
+                        (typedRegistrationValidator settings)
                         ( RegistrationDatum
                             { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
                             , signature = toBuiltin invalidSignature
@@ -697,7 +681,7 @@ registerWithNoRegistrationDatum keyPair ennft commission operator = do
                         operator
                         (V3.singleton (associatedENOPNFTCurrencySymbol settings) (tokenName ennft) 1)
                     , paysScriptNoDatum
-                        (typedScript settings)
+                        (typedRegistrationValidator settings)
                         (V3.singleton (currencySymbol ennft) (tokenName ennft) 1)
                     ]
                 }
@@ -741,7 +725,7 @@ registerWithHashedRegistrationDatum keyPair ennft commission operator = do
                         operator
                         (V3.singleton (associatedENOPNFTCurrencySymbol settings) (tokenName ennft) 1)
                     , paysScriptDatumHash
-                        (typedScript settings)
+                        (typedRegistrationValidator settings)
                         ( RegistrationDatum
                             { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
                             , signature = toBuiltin signedMessage
@@ -844,7 +828,7 @@ registerMoreThanOneOperator keyPair (currencySymbolEnnfts, ennft1Tn, ennft2Tn) c
                         operator
                         (V3.singleton (associatedENOPNFTCurrencySymbol settings) ennft2Tn 1)
                     , paysScriptInlineDatum
-                        (typedScript settings)
+                        (typedRegistrationValidator settings)
                         ( RegistrationDatum
                             { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
                             , signature = toBuiltin signedMessage1
@@ -856,7 +840,7 @@ registerMoreThanOneOperator keyPair (currencySymbolEnnfts, ennft1Tn, ennft2Tn) c
                         )
                         (V3.singleton currencySymbolEnnfts ennft1Tn 1)
                     , paysScriptInlineDatum
-                        (typedScript settings)
+                        (typedRegistrationValidator settings)
                         ( RegistrationDatum
                             { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
                             , signature = toBuiltin signedMessage2
@@ -877,22 +861,3 @@ registerMoreThanOneOperator keyPair (currencySymbolEnnfts, ennft1Tn, ennft2Tn) c
             (associatedENOPNFTCurrencySymbol settings)
             ennft2Tn
         )
-instance PrettyCooked Action where
-    prettyCookedOpt opts Mint = "Mint ENNOPNFT"
-    prettyCookedOpt opts Burn = "Burn ENNOPNFT"
-
-instance PrettyCooked RegistrationDatum where
-    prettyCookedOpt opts RegistrationDatum{..} =
-        "RegistrationDatum: "
-            <> "\n  ayaValidatorPublicKey: "
-            <> pretty (Text.unpack . encode . fromByteString @Hexadecimal . fromBuiltin $ ayaValidatorPublicKey)
-            <> "\n  ennftTokenName: "
-            <> prettyCookedOpt opts ennftTokenName
-            <> "\n  cardanoRewardPubKey: "
-            <> prettyCookedOpt opts cardanoRewardPubKey
-            <> "\n  commission: "
-            <> prettyCookedOpt opts commission
-            <> "\n  enopNFTCurrencySymbol: "
-            <> prettyCookedOpt opts enopNFTCurrencySymbol
-            <> "\n  signature: "
-            <> pretty (Text.unpack . encode . fromByteString @Hexadecimal . fromBuiltin $ signature)

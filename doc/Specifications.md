@@ -74,55 +74,51 @@ TBD
 
 ## Executable Specifications
 
-### Register  
-A valid Registration produces a an NFT (ENOPNFT), therefore the Register Action is under the responsability of the ENOPNFT Minting Script.
+- Registration Specifications
+  - Nominal Cases
+      - Register
+      - Update 
+      - Unregister                                                
+  - `Property 1` : Non Fungible Property Transitivity : EN Token is an NFT => the ENOP Token should be an NFT
+    - `Register` 
+      - `Property 1.0` : When Minting ENOP Tokens, Tokens Quantities are verified
+        - `Property. 1.0.1 violation` - No ENNOP Minted (can't be enforced it is an issue...):  
+        - `Property. 1.0.2 violation` - ENNOP's Minted Quantity > 1:                             
+        - `Property. 1.0.4 violation` - ENNFT 's Minted Quantity > 1:                            
+      - `Property 1.1` : When Minting ENOP Tokens, NFTs Token Names & Cardinality equality : There is 1-1 relationship between the ENNFT and the ENOPNFT
+        - `Property. 1.1.0 violation` - ENOPNFT TokenName =/ ENNFT TokenName:                   
+        - `Property. 1.1.1 violation` - |ENOP NFT| > 1 (Cardinality Violation):                 
+        - `Property. 1.1.2 violation` - |EN NFT|   > 1 (Cardinality Violation):
+    - `Update`
+      - only 1 EN NFT and 1 ENOP NFT are used with no minting
+    - `UnRegister`                 
+  - `Property 2` : Preserving NFTs ownership : ENOP and ENNFT can be swapped only between the operator and the registration smart contract
+    - `Register`
+      - `Property 2.0` : ENOP NFT should be minted only to the operator
+        - `Property. 2.0.0 violation` - ENNOP Minted Not Output to Operator:                    
+      - `Property 2.1` : Only the operator should sign the transaction
+        - `Property. 2.1.0 violation` - No signer found (Enforced by Ledger Properties):        
+        - `Property. 2.1.1 violation` - signer is not unique: 
+      - `Property 2.2` : ENNFT should be provided by operator and spent on script
+        - `Property. 1.0.3 violation` - No ENNFT on Registration validator output:               
+    - `Update`
+      - an only ENOP NFT should be provided by the operator
+      - an only ENOP NFT should be sent back to the operator
+      - an only ENNFT should be move from a registration script UTxO to another one
+      - `Property 2.1` : Only the operator should sign the transaction
+        - `Property. 2.1.0 violation` - No signer found (Enforced by Ledger Properties)        
+        - `Property. 2.1.1 violation` - signer is not unique
+    - `Unregister`                                  
 
-### Properties for Minting the ENOPNFT 
-
-An ENOPNFT is only minted if its corresponding ENNFT is locked on the script with a valid RegistrationDatum :    
-
-1. The ENNFT is on the UTxO value that will be stored in the Right Validator Registration Script
-2. `enopnft.tokenName == ennft.tokenName`
-2. Datum is signed with AV PubKey contained in the Datum (using ZK1 Signatures)
-3. ENRegistration Datum is valid 
-```haskell
-data RegistrationDatum = RegistrationDatum
-    { -- | Owner Account which is operating the Aya Validator on the Aya chain  
-      enOperatorAddress :: BuiltinByteString
-      -- | Validator Pubkey of the consensus Node
-    , enConsensusPubKey :: BuiltinByteString
-      -- | MerkleRoot for verifiable randomness (this will disappear)
-    , enMerkleTreeRoot :: BuiltinByteString
-      -- | CrossChain Pubkey which can be verified on both chains
-    , enCceAddress :: BuiltinByteString
-      -- | Unique ENNFT name, "used" for this registration
-    , enUsedNftTn :: TokenName
-      -- | Operator's wallet where rewards will be delivered after participating in a block production in Aya
-    , enRwdWallet :: PubKeyHash
-      -- | Commission in percent shared with staking delegators.
-    , enCommission :: Integer
-      -- | We cannot store the EnOpNft CurrencySymbol in the parameter because we get a cyclic ?dependency
-      -- Nicolas Henin : This should be removed, it can be retrieved Offchain 
-    , pEnOpCs :: CurrencySymbol 
-      -- | Signature of the datum. All datum fields concatenated and signed by the enCceAddress  
-    , enSignature :: BuiltinByteString
-    }
-    deriving (Prelude.Show, Generic, FromJSON, ToJSON, Prelude.Eq, Prelude.Ord)
-```
- - Not Clear : How Do we validate sidechain params : 
-    - ReferenceInput AyACommitteeUTxO, which must contain the Sidechain Identity NFT ? 
-    - Sidechain Parameter Hash must match with that in the AyACommitteeUTxO’s Inline-Datum and it must contain the Identity-NFT of the sidechain for verification
- - `datum.enUsedNftTn.tokenName == enopnft.tokenName == value.ennft.tokenName`
-
-
- ## Update 
-
-    - A ENOPNFT matching the stored ENNFT needs to be provided 
-    - only a subset of fields could be updated ? 
-    - datum needs to be correctly signed 
-    - The ENOPNFT need to be returned to the same address as the input one ? (at least it should be put in the script utxo)
-
- ## Unregistrer
-
-    - A ENOPNFT matching the stored ENNFT needs to be provided
-    - The ENOPNFT needs to be burned.
+  - `Property 3` : Authenticity of the registration details (datum) should be verifiable and Valid (Signed and Provided by the owner of the ENNFT)
+   - `Register`
+    - `Property. 3.0 violation` - Registration datum should be valid
+        -  `ennftTokenName` field should be equal to the spent ennft token Name
+        -  `enopNFTCurrencySymbol` field should be equal to the ENOP NFT currency Symbol minted
+    - `Property. 3.0 violation` - Registration datum can not be deserialized
+    - `Property. 3.0 violation` - Registration datum is not Auhtentic                              
+    - `Property. 3.1 violation` - Registration validator output not found (not verifiable)                 
+    - `Property. 3.2 violation` - Registration validator output has no datum (not verifiable)             
+    - `Property. 3.3 violation` - Registration validator output has only the hashed datum (not verifiable)  
+    - `Property. 3.4 violation` - More than one Registration validator output is not allowed (Reducing complexity)
+   
