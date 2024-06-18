@@ -15,24 +15,14 @@
 {-# OPTIONS_GHC -fno-strictness #-}
 {-# OPTIONS_GHC -fobject-code #-}
 
-module Adapter.Plutus (
-    validatorToTypedValidator,
-    propertyViolation,
-    propertyViolationIfFalse,
+module Adapter.Plutus.OffChain (
+    validatorToTypedValidator
 ) where
 
 import Plutus.Script.Utils.Scripts qualified as Script
 import Plutus.Script.Utils.Typed qualified as Script hiding (validatorHash)
 import Plutus.Script.Utils.V3.Typed.Scripts.MonetaryPolicies qualified as Script
-import PlutusTx.Prelude
 
-{-# INLINEABLE propertyViolation #-}
-propertyViolation :: BuiltinString -> a
-propertyViolation = traceError
-
-{-# INLINEABLE propertyViolationIfFalse #-}
-propertyViolationIfFalse :: BuiltinString -> Bool -> Bool
-propertyViolationIfFalse = traceIfFalse
 
 validatorToTypedValidator :: Script.Validator -> Script.TypedValidator a
 validatorToTypedValidator val =

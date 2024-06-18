@@ -24,7 +24,8 @@ library
     -fplugin-opt PlutusTx.Plugin:defer-errors
 
   exposed-modules:
-    Adapter.Plutus
+    Adapter.Plutus.OffChain
+    Adapter.Plutus.OnChain
     ENOPNFT.MonetaryPolicy
     ENOPNFT.OnChainMonetaryPolicy
     OnChainRegistrationValidator
@@ -49,7 +50,7 @@ test-suite en-registration-unit-tests
     Adapter.CardanoCryptoClass.Crypto
     Model
     Register.Fixture
-    Register.Spec
+    Specifications
     Register.TxBuilding
     Update.TxBuilding
 
@@ -74,6 +75,7 @@ test-suite en-registration-unit-tests
     , tasty-hunit
     , tasty-quickcheck
     , text
+    , safe
 
   build-tool-depends: hspec-discover:hspec-discover
   ghc-options:        -threaded

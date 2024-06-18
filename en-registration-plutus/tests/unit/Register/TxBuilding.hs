@@ -49,11 +49,11 @@ import Plutus.Script.Utils.Scripts qualified as Script
 import Adapter.CardanoCryptoClass.Crypto
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.ByteString (ByteString)
-import Data.Coerce (coerce)
+
 import Data.List.NonEmpty qualified as NL
 import Data.Text qualified as Text
 import Model
-import OnChainRegistrationValidator (ENNFTCurrencySymbol (..), RegistrationDatum (..), mkHashedRegistrationMessage)
+import OnChainRegistrationValidator (RegistrationValidatorSettings (..), RegistrationDatum (..), mkHashedRegistrationMessage)
 import PlutusLedgerApi.V1.Value qualified as Value
 import PlutusLedgerApi.V3 (BuiltinByteString, CurrencySymbol, PubKeyHash, TokenName, fromBuiltin, toBuiltin, toBuiltinData)
 import PlutusLedgerApi.V3 qualified as Api
@@ -72,9 +72,9 @@ register ::
     ENNFT ->
     Commission ->
     Wallet ->
-    m ENOPNFT
+    m (RegistrationValidatorSettings,ENOPNFT)
 register keyPair ennft commission operator = do
-    let settings = coerce . currencySymbol $ ennft
+    let settings = RegistrationValidatorSettings . currencySymbol $ ennft
         signedMessage =
             sign
                 (signatureKey keyPair)
@@ -113,10 +113,8 @@ register keyPair ennft commission operator = do
                         (V3.singleton (currencySymbol ennft) (tokenName ennft) 1)
                     ]
                 }
-    return $
-        NFT
-            (associatedENOPNFTCurrencySymbol settings)
-            (tokenName ennft)
+    
+    return (settings,NFT (associatedENOPNFTCurrencySymbol settings) (tokenName ennft))
 
 registerMintingAnENOPWithQuantityAbove1 ::
     (ContextDSIGN a ~ (), DSIGNAlgorithm a, Signable a ByteString) =>
@@ -127,7 +125,7 @@ registerMintingAnENOPWithQuantityAbove1 ::
     Wallet ->
     m ()
 registerMintingAnENOPWithQuantityAbove1 keyPair ennft commission operator = do
-    let settings = coerce . currencySymbol $ ennft
+    let settings = RegistrationValidatorSettings . currencySymbol $ ennft
         signedMessage =
             sign
                 (signatureKey keyPair)
@@ -177,7 +175,7 @@ registerWithoutAnENNFT ::
     Wallet ->
     m ENOPNFT
 registerWithoutAnENNFT keyPair ennft commission operator = do
-    let settings = coerce . currencySymbol $ ennft
+    let settings = RegistrationValidatorSettings . currencySymbol $ ennft
         signedMessage =
             sign
                 (signatureKey keyPair)
@@ -231,7 +229,7 @@ registerWithanENNFTWithAQuantityAbove1 ::
     Wallet ->
     m ENOPNFT
 registerWithanENNFTWithAQuantityAbove1 keyPair ennft ennftQuantityAbove1 commission operator = do
-    let settings = coerce . currencySymbol $ ennft
+    let settings = RegistrationValidatorSettings . currencySymbol $ ennft
         signedMessage =
             sign
                 (signatureKey keyPair)
@@ -284,7 +282,7 @@ registerByGeneratingMoreThan1ENNFT ::
     Wallet ->
     m ENOPNFT
 registerByGeneratingMoreThan1ENNFT keyPair (ennftCurrencySymbol, firstEnnftTn, ennftTns) commission operator = do
-    let settings = coerce ennftCurrencySymbol
+    let settings = RegistrationValidatorSettings ennftCurrencySymbol
         signedMessage =
             sign
                 (signatureKey keyPair)
@@ -338,7 +336,7 @@ registerByGeneratingMoreThan1ENOPNFT ::
     Wallet ->
     m [ENOPNFT]
 registerByGeneratingMoreThan1ENOPNFT keyPair ennft differentTokenNames commission operator = do
-    let settings = coerce . currencySymbol $ ennft
+    let settings = RegistrationValidatorSettings . currencySymbol $ ennft
         signedMessage =
             sign
                 (signatureKey keyPair)
@@ -397,7 +395,7 @@ registerAndMintToAnotherOperator ::
     Wallet ->
     m ENOPNFT
 registerAndMintToAnotherOperator keyPair ennft commission operator anotherOperator = do
-    let settings = coerce . currencySymbol $ ennft
+    let settings = RegistrationValidatorSettings . currencySymbol $ ennft
         signedMessage =
             sign
                 (signatureKey keyPair)
@@ -451,7 +449,7 @@ registerWith2WalletsSigning ::
     Wallet ->
     m ENOPNFT
 registerWith2WalletsSigning keyPair ennft commission operator anotherWallet = do
-    let settings = coerce . currencySymbol $ ennft
+    let settings = RegistrationValidatorSettings . currencySymbol $ ennft
         signedMessage =
             sign
                 (signatureKey keyPair)
@@ -504,7 +502,7 @@ registerWithoutSigning ::
     Wallet ->
     m ENOPNFT
 registerWithoutSigning keyPair ennft commission operator = do
-    let settings = coerce . currencySymbol $ ennft
+    let settings = RegistrationValidatorSettings . currencySymbol $ ennft
         signedMessage =
             sign
                 (signatureKey keyPair)
@@ -558,7 +556,7 @@ registerWithDifferentENandENOPNFTTokenNames ::
     Wallet ->
     m ENOPNFT
 registerWithDifferentENandENOPNFTTokenNames keyPair ennft enoptTokenName commission wallet = do
-    let settings = coerce . currencySymbol $ ennft
+    let settings = RegistrationValidatorSettings . currencySymbol $ ennft
         signedMessage =
             sign
                 (signatureKey keyPair)
@@ -612,7 +610,7 @@ registerWithInvalidDatumVerification ::
     ByteString ->
     m ENOPNFT
 registerWithInvalidDatumVerification keyPair ennft commission operator invalidSignature = do
-    let settings = coerce . currencySymbol $ ennft
+    let settings = RegistrationValidatorSettings . currencySymbol $ ennft
     _ <-
         validateTxSkel $
             txSkelTemplate
@@ -655,7 +653,7 @@ registerWithNoRegistrationDatum ::
     Wallet ->
     m ENOPNFT
 registerWithNoRegistrationDatum keyPair ennft commission operator = do
-    let settings = coerce . currencySymbol $ ennft
+    let settings = RegistrationValidatorSettings . currencySymbol $ ennft
         signedMessage =
             sign
                 (signatureKey keyPair)
@@ -699,7 +697,7 @@ registerWithHashedRegistrationDatum ::
     Wallet ->
     m ENOPNFT
 registerWithHashedRegistrationDatum keyPair ennft commission operator = do
-    let settings = coerce . currencySymbol $ ennft
+    let settings = RegistrationValidatorSettings . currencySymbol $ ennft
         signedMessage =
             sign
                 (signatureKey keyPair)
@@ -751,7 +749,7 @@ mintWithoutRegistrationScript ::
     Wallet ->
     m ENOPNFT
 mintWithoutRegistrationScript keyPair ennft operator = do
-    let settings = coerce . currencySymbol $ ennft
+    let settings = RegistrationValidatorSettings . currencySymbol $ ennft
     _ <-
         validateTxSkel $
             txSkelTemplate
@@ -785,7 +783,7 @@ registerMoreThanOneOperator ::
     Wallet ->
     m (ENOPNFT, ENOPNFT)
 registerMoreThanOneOperator keyPair (currencySymbolEnnfts, ennft1Tn, ennft2Tn) commission operator = do
-    let settings = coerce currencySymbolEnnfts
+    let settings = RegistrationValidatorSettings currencySymbolEnnfts
         signedMessage1 =
             sign
                 (signatureKey keyPair)
