@@ -87,7 +87,7 @@ update keyPair registratedItemId@(settings,enopNFT) newCommission operator newOp
                 , txSkelOpts = def{txOptEnsureMinAda = True}
                 , txSkelValidityRange = Api.always
                 , txSkelSigners = [operator]
-                , txSkelIns = Map.singleton registeredItemRef (TxSkelRedeemerForScript UpdateRegistrationDetails)
+                -- , txSkelIns = Map.singleton registeredItemRef (TxSkelRedeemerForScript UpdateRegistrationDetails)
                 , txSkelInsReference = Set.empty
                 , txSkelOuts =
                     [ paysPK

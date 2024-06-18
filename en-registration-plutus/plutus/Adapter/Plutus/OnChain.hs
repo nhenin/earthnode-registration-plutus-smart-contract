@@ -30,7 +30,10 @@ import PlutusTx.Prelude
 
 {-# INLINEABLE fromMaybe' #-}
 fromMaybe' :: a -> Maybe a -> a
-fromMaybe' d x = case x of {Nothing -> d;Just v  -> v}
+fromMaybe' d 
+    = \case 
+        Nothing -> d
+        Just v  -> v
 
 {-# INLINEABLE propertyViolation #-}
 propertyViolation :: BuiltinString -> a

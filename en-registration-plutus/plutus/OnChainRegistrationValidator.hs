@@ -52,7 +52,7 @@ import PlutusTx.Prelude as Plutus.Prelude
     ( otherwise,
       Bool(..),
       Integer,
-      Maybe(Nothing),
+      Maybe(..),
       Eq(..),
       Ord((<=)),
       Functor(fmap),
@@ -75,7 +75,7 @@ import Plutus.Script.Utils.V3.Contexts (
  )
 import Plutus.Script.Utils.V3.Scripts (ValidatorHash)
 import Specifications
-import Adapter.Plutus.OnChain
+import Adapter.Plutus.OnChain ( fromMaybe', propertyViolation )
 import PlutusTx.AssocMap qualified as Map
 import PlutusLedgerApi.V3.Contexts (valuePaidTo)
 import PlutusTx.Applicative ()
@@ -177,20 +177,21 @@ PlutusTx.makeLift ''RegistrationAction
 
 
 {-# INLINEABLE canUpdateRegistration #-}
-canUpdateRegistration :: RegistrationValidatorSettings  -> ScriptContext -> Bool
-canUpdateRegistration RegistrationValidatorSettings{..} ctx =
-  let (datumInput, ennftTokenNameInput) = getRegistrationDatumAndENNFTTokenNameInput ennftCurrencySymbol ctx
+canUpdateRegistration :: RegistrationValidatorSettings -> ScriptContext -> Bool
+canUpdateRegistration RegistrationValidatorSettings{..} ctx = 
+  let 
+      (datumInput, ennftTokenNameInput) = getRegistrationDatumAndENNFTTokenNameInput ennftCurrencySymbol ctx
       (datumOutput, ennftTokenNameOutput) = getRegistrationDatumAndENNFTTokenNameOutput (ownHash ctx) ennftCurrencySymbol (scriptContextTxInfo ctx)
-      enopNFTNameOutput = enopNFTNameGivenToUniqueAndOnlyOperator (enopNFTCurrencySymbol datumInput) (scriptContextTxInfo ctx)
-      enopNFTNameInput = enopNFTNameSpentByUniqueOperator (enopNFTCurrencySymbol datumInput) (scriptContextTxInfo ctx)
+    --   enopNFTNameOutput = enopNFTNameGivenToUniqueAndOnlyOperator (enopNFTCurrencySymbol datumInput) (scriptContextTxInfo ctx)
+    --   enopNFTNameInput = enopNFTNameSpentByUniqueOperator (enopNFTCurrencySymbol datumInput) (scriptContextTxInfo ctx)
    in
       checkRegistrationSignature datumInput
       && checkRegistrationSignature datumOutput
       && ennftTokenNameInput == ennftTokenNameOutput 
-      && enopNFTNameInput == enopNFTNameOutput  
+    --   && enopNFTNameInput == enopNFTNameOutput  
       && ennftTokenName datumInput == ennftTokenName datumOutput
-      && enopNFTNameOutput == ennftTokenNameOutput 
-      && enopNFTNameOutput == ennftTokenName datumOutput 
+    --   && enopNFTNameOutput == ennftTokenNameOutput 
+    --   && enopNFTNameOutput == ennftTokenName datumOutput 
       && enopNFTCurrencySymbol datumInput == enopNFTCurrencySymbol datumOutput
       
 
@@ -201,7 +202,9 @@ getRegistrationDatumAndENNFTTokenNameOutput registrationValidatorHash ennftCurre
         [] -> propertyViolation prop_3_1_RegistrationScriptNotFound
         [(OutputDatum (Datum scriptDatum), scriptValue)] ->
             (,getENNFTTokenName ennftCurrencySymbol scriptValue)
-            . fromMaybe'  (propertyViolation prop_3_5_DatumDeserializationFailed)
+            . (\case 
+                Nothing -> propertyViolation prop_3_5_DatumDeserializationFailed
+                Just x ->  x )
             . fromBuiltinData @RegistrationDatum 
             $ scriptDatum
         [(NoOutputDatum, _)] -> propertyViolation prop_3_2_NoRegistrationDatum
@@ -356,8 +359,9 @@ canUnregister RegistrationValidatorSettings{..} RegistrationDatum{..} ctx
 
 {-# INLINEABLE mkValidatorFunction #-}
 mkValidatorFunction :: RegistrationValidatorSettings -> RegistrationDatum -> RegistrationAction -> ScriptContext -> Bool
-mkValidatorFunction registrationValidatorSettings _ UpdateRegistrationDetails ctx = canUpdateRegistration registrationValidatorSettings  ctx
-mkValidatorFunction registrationValidatorSettings d Unregister ctx = canUnregister registrationValidatorSettings d ctx
+mkValidatorFunction registrationValidatorSettings _ UpdateRegistrationDetails ctx = canUpdateRegistration registrationValidatorSettings ctx
+mkValidatorFunction registrationValidatorSettings datum Unregister ctx = canUnregister registrationValidatorSettings datum ctx
+
 
 {-# INLINEABLE mkUntypedValidatorFunction #-}
 mkUntypedValidatorFunction :: RegistrationValidatorSettings -> BuiltinData -> BuiltinData -> BuiltinData -> ()

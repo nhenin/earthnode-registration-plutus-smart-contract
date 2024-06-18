@@ -76,9 +76,9 @@ instance PrettyCooked Action where
     prettyCookedOpt opts Mint = "Mint ENNOPNFT"
     prettyCookedOpt opts Burn = "Burn ENNOPNFT"
 
-instance PrettyCooked RegistrationAction where
-    prettyCookedOpt opts UpdateRegistrationDetails = "UpdateRegistrationDetails"
-    prettyCookedOpt opts Unregister = "Unregister"
+-- instance PrettyCooked RegistrationAction where
+--     prettyCookedOpt opts UpdateRegistrationDetails = "UpdateRegistrationDetails"
+--     prettyCookedOpt opts Unregister = "Unregister"
 
 instance PrettyCooked RegistrationDatum where
     prettyCookedOpt opts RegistrationDatum{..} =
