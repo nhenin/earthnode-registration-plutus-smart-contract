@@ -22,15 +22,24 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:conservative-optimisation #-}
+{-# LANGUAGE LambdaCase #-}
+
 
 module OnChainRegistrationValidator (
     mkUntypedValidatorFunction,
     mkValidatorFunction,
     checkRegistrationSignature,
     mkHashedRegistrationMessage,
-    ENNFTCurrencySymbol (..),
+    getRegistrationDatumAndENNFTTokenNameOutput,
+    getRegistrationDatumAndENNFTTokenNameInput,
+    RegistrationValidatorSettings (..),
     RegistrationDatum (..),
     RegistrationAction (..),
+    Quantity (..),
+    getENOPNFTTokenName,
+    getENNFTTokenName,
+    enopNFTNameGivenToUniqueAndOnlyOperator,
+
 ) where
 
 import GHC.Generics (Generic)
@@ -39,29 +48,55 @@ import Plutus.Script.Utils.Value
 import PlutusLedgerApi.V3
 import PlutusTx qualified
 import PlutusTx.Prelude as Plutus.Prelude
+    ( otherwise,
+      Bool(..),
+      Integer,
+      Maybe(..),
+      Eq(..),
+      Ord((<=)),
+      Functor(fmap),
+      (&&),
+      (.),
+      appendByteString,
+      consByteString,
+      ($),
+      maybe,
+      check )
 import Prelude qualified
 
 import PlutusTx.Builtins qualified as Cryptography
 
-import Plutus.Script.Utils.V3.Contexts (
-    findOwnInput,
-    ownHash,
-    scriptOutputsAt,
-    valueProduced,
-    valueSpent,
- )
+import Specifications
+import Adapter.Plutus.OnChain 
+import PlutusTx.AssocMap qualified as Map
+import PlutusTx.Applicative ()
 
-newtype ENNFTCurrencySymbol = ENNFTCurrencySymbol
+import Plutus.Script.Utils.V3.Contexts (valueSpent)
+-- import PlutusLedgerApi.V3.Contexts (findOwnInput)
+
+data Quantity = One | MoreThanOne
+    deriving (Prelude.Show)
+
+instance Eq Quantity where
+    {-# INLINEABLE (==) #-}
+    One == One = True
+    MoreThanOne == MoreThanOne = True
+    _ == _ = False
+
+PlutusTx.unstableMakeIsData ''Quantity
+PlutusTx.makeLift ''Quantity
+
+newtype RegistrationValidatorSettings = RegistrationValidatorSettings
     { ennftCurrencySymbol :: CurrencySymbol
     }
     deriving (Prelude.Show, Generic, Ord)
 
-instance Eq ENNFTCurrencySymbol where
+instance Eq RegistrationValidatorSettings where
     {-# INLINEABLE (==) #-}
-    ENNFTCurrencySymbol x == ENNFTCurrencySymbol y = x == y
+    RegistrationValidatorSettings x == RegistrationValidatorSettings y = x == y
 
-PlutusTx.unstableMakeIsData ''ENNFTCurrencySymbol
-PlutusTx.makeLift ''ENNFTCurrencySymbol
+PlutusTx.unstableMakeIsData ''RegistrationValidatorSettings
+PlutusTx.makeLift ''RegistrationValidatorSettings
 
 data RegistrationDatum = RegistrationDatum
     { ayaValidatorPublicKey :: BuiltinByteString
@@ -94,8 +129,27 @@ instance Eq RegistrationDatum where
             && signature x
             == signature y
 
-PlutusTx.makeIsDataIndexed ''RegistrationDatum [('RegistrationDatum, 0)]
+PlutusTx.unstableMakeIsData ''RegistrationDatum 
 PlutusTx.makeLift ''RegistrationDatum
+
+{- | The actions that can be performed by the operator
+| N.B : The action Register is enforced by the ENOPNFT NFT minting policy
+-}
+data RegistrationAction
+    = -- | Unregister the operator
+      Unregister
+    | -- | Update the registration information
+      UpdateRegistrationDetails 
+    deriving (Prelude.Show, Generic)
+
+instance Eq RegistrationAction where
+    {-# INLINEABLE (==) #-}
+    Unregister == Unregister = True
+    UpdateRegistrationDetails == UpdateRegistrationDetails = True
+    _ == _ = False
+
+PlutusTx.makeIsDataIndexed ''RegistrationAction [('UpdateRegistrationDetails, 0), ('Unregister, 1)]
+PlutusTx.makeLift ''RegistrationAction
 
 -- {-# INLINABLE checkDatumSig #-}
 -- Check the signature of the registration datum
@@ -115,93 +169,148 @@ mkHashedRegistrationMessage ennftTokenName cardanoRewardPubKey commission enopNF
         . consByteString commission
         $ unCurrencySymbol enopNFTCurrencySymbol
 
-{- | The actions that can be performed by the operator
-| N.B : The action Register is enforced by the ENOPNFT NFT minting policy
--}
-data RegistrationAction
-    = -- | Unregister the operator
-      Unregister
-    | -- | Update the registration information
-      Update BuiltinByteString
-    deriving (Prelude.Show, Generic, Prelude.Eq, Prelude.Ord)
 
-PlutusTx.makeIsDataIndexed ''RegistrationAction [('Unregister, 0), ('Update, 1)]
-PlutusTx.makeLift ''RegistrationAction
 
-{-- updateRegistration --}
--- ENOs can update the registration information, for that the signature of the current and the new datum is checked
--- it is also checked if the correct ENOP-NFT is spent in this transaction.
--- is must be ensured that the enUsedNftTn and pEnOpCs never change, this can only be done by performing a new registration
+
 {-# INLINEABLE canUpdateRegistration #-}
-canUpdateRegistration :: ENNFTCurrencySymbol -> BuiltinByteString -> ScriptContext -> Bool
-canUpdateRegistration ENNFTCurrencySymbol{..} _ ctx
-    -- \| checkDatumSig nDat, -- new datum signature is verifued
-    -- checkDatumSig cDat, -- old datum signature is verified
-    -- newDatumSigned, -- signature check of new datum by old key
-    | hasEnOpNft ov cDat -- EnOpNFT is in the new output UTxO
-    , hasEnOpNft iv cDat -- EnOpNFT is spent and present in input UTxO
-    , hasEnNft cv (ennftTokenName cDat) -- ENNFT is in inputs
-    , hasEnNft nv (ennftTokenName cDat) -- ENNFT is in smart contract output
-    , opOk nDat cDat =
-        True -- The Tokenname and Policy of the ENOPNFT did not change
-    | otherwise = False
-  where
-    -- Make sure the ENOP-NFT is spent
-    hasEnOpNft :: Value -> RegistrationDatum -> Bool
-    hasEnOpNft v d = valueOf v (enopNFTCurrencySymbol d) (ennftTokenName d) == 1
+canUpdateRegistration :: RegistrationValidatorSettings -> ScriptContext -> Bool
+canUpdateRegistration RegistrationValidatorSettings{..} ctx = 
+  let 
+      (datumInput, ennftTokenNameInput) = getRegistrationDatumAndENNFTTokenNameInput ennftCurrencySymbol ctx
+      (datumOutput, ennftTokenNameOutput) = getRegistrationDatumAndENNFTTokenNameOutput (ownHash ctx) ennftCurrencySymbol (scriptContextTxInfo ctx)
+      enopNFTNameOutput = enopNFTNameGivenToUniqueAndOnlyOperator (enopNFTCurrencySymbol datumInput) (scriptContextTxInfo ctx)
+      enopNFTNameInput = enopNFTNameSpentByUniqueOperator (enopNFTCurrencySymbol datumInput) (scriptContextTxInfo ctx)
+   in
+      checkRegistrationSignature datumInput
+      && checkRegistrationSignature datumOutput
+      && ennftTokenNameInput == ennftTokenNameOutput 
+      && enopNFTNameInput == enopNFTNameOutput  
+      && ennftTokenName datumInput == ennftTokenName datumOutput
+      && enopNFTNameOutput == ennftTokenNameOutput 
+      && enopNFTNameOutput == ennftTokenName datumOutput 
+      && enopNFTCurrencySymbol datumInput == enopNFTCurrencySymbol datumOutput
+      
+{-# INLINEABLE getRegistrationDatumAndENNFTTokenNameOutput #-}
+getRegistrationDatumAndENNFTTokenNameOutput :: ScriptHash -> CurrencySymbol -> TxInfo -> (RegistrationDatum, TokenName)
+getRegistrationDatumAndENNFTTokenNameOutput registrationValidatorHash ennftCurrencySymbol =
+    \case
+        [] -> propertyViolation prop_3_1_RegistrationScriptNotFound
+        [(OutputDatum (Datum scriptDatum), scriptValue)] ->
+            (\case 
+                Nothing -> propertyViolation prop_3_5_DatumDeserializationFailed
+                Just x -> (x,getENNFTTokenName ennftCurrencySymbol scriptValue) )
+            . fromBuiltinData  
+            $ scriptDatum
+        [(NoOutputDatum, _)] -> propertyViolation prop_3_2_NoRegistrationDatum
+        [(OutputDatumHash _, _)] -> propertyViolation prop_3_3_OnlyHashRegistration
+        _  -> propertyViolation prop_3_4_MoreThanOneRegistrationOutput
+    . scriptOutputsAt registrationValidatorHash
+    
 
-    -- Make sure ENNFT is in input and output
-    hasEnNft :: Value -> TokenName -> Bool
-    hasEnNft v t = valueOf v ennftCurrencySymbol t == 1
-
-    -- Make sure the TokenName and CurrencySymbol don't change
-    opOk :: RegistrationDatum -> RegistrationDatum -> Bool
-    opOk d1 d2 = enopNFTCurrencySymbol d1 == enopNFTCurrencySymbol d2 && ennftTokenName d1 == ennftTokenName d2
-
-    -- Check if the new datum was signed by the current consensus public key, the signature must be provided by the redeemer
-    -- newDatumSigned = BI.verifySchnorrSecp256k1Signature (enOperatorAddress cDat) (makeMessage nDat) sig
-
-    -- Input Value
-    iv = valueSpent info
-
-    -- Output Value
-    ov = valueProduced info
-
-    -- Construct the EnRegistration Datum
-    nDat = makeEnRegDatum nd
-    cDat = makeEnRegDatum cd
-
-    -- get the OutputDatum (New Datum) and Value
-    (nd, nv) = getRegOutputDatum (scriptOutputsAt (ownHash ctx) info)
-    -- Extract Datum and Value from Output UTxO
-    getRegOutputDatum :: [(OutputDatum, Value)] -> (Datum, Value)
-    getRegOutputDatum [(OutputDatum nd', nv')] = (nd', nv')
-    getRegOutputDatum _ = traceError "wrongOutputDatum"
-
-    -- get the InputDatum (Current Datum) and Value
-    (cd, cv) = case findOwnInput ctx of
-        Just i -> extractTxO $ txInInfoResolved i
-        Nothing -> traceError "CouldNotFindOwnInput"
-    -- Extract Datum and Value from Input UTxO
-    extractTxO :: TxOut -> (Datum, Value)
-    extractTxO
+{-# INLINEABLE getRegistrationDatumAndENNFTTokenNameInput #-}
+getRegistrationDatumAndENNFTTokenNameInput ::  CurrencySymbol -> ScriptContext -> (RegistrationDatum, TokenName)
+getRegistrationDatumAndENNFTTokenNameInput ennftCurrencySymbol  =
+    \case
+        (OutputDatum (Datum scriptDatum), scriptValue) ->
+            (\case 
+                Nothing -> propertyViolation prop_3_5_DatumDeserializationFailed
+                Just x -> (x,getENNFTTokenName ennftCurrencySymbol scriptValue) )
+            . fromBuiltinData  
+            $ scriptDatum
+        (NoOutputDatum, _)     -> propertyViolation prop_3_2_NoRegistrationDatum
+        (OutputDatumHash _, _) -> propertyViolation prop_3_3_OnlyHashRegistration
+    . (\case
         TxOut
             { txOutAddress = Address (ScriptCredential _) _
-            , txOutValue
-            , txOutDatum = OutputDatum cd'
+            , txOutValue = v
+            , txOutDatum = d
             , txOutReferenceScript = Nothing
-            } = (cd', txOutValue)
-    extractTxO _ = traceError "wrongInputDatum"
+            } -> (d, v)
+        _ -> propertyViolation "Invalid Registration Input")
+    . txInInfoResolved
+    . fromMaybe' (propertyViolation "No Registration Input Found")
+    . findOwnInput
 
-    -- make ENRegistration from Datum
-    makeEnRegDatum :: Datum -> RegistrationDatum
-    makeEnRegDatum = unsafeFromBuiltinData . getDatum
 
-    info = scriptContextTxInfo ctx
+{-# INLINEABLE getENOPNFTTokenName #-}
+getENOPNFTTokenName :: CurrencySymbol -> TxInfo -> TokenName
+getENOPNFTTokenName enopNFTCurrencySymbol =
+    getNFTTokenName
+        mkENOPNFTPropertyViolationMsg
+        enopNFTCurrencySymbol
+        . txInfoMint
+
+{-# INLINEABLE getENNFTTokenName #-}
+getENNFTTokenName :: CurrencySymbol -> Value -> TokenName
+getENNFTTokenName = getNFTTokenName mkENNFTPropertyViolationMsg
+
+{-# INLINEABLE getNFTTokenName #-}
+getNFTTokenName :: NFTPropertyViolationMsg -> CurrencySymbol -> Value -> TokenName
+getNFTTokenName nftPropertyViolationMsg@NFTPropertyViolationMsg{..} enopNFTCurrencySymbol =
+    \case
+        (tn, One) -> tn
+        (_, MoreThanOne) -> propertyViolation whenQuantityMoreThanOne
+        . getUniqueTokenNameAndQuantity nftPropertyViolationMsg enopNFTCurrencySymbol
+
+
+{-# INLINEABLE getUniqueTokenNameAndQuantity #-}
+getUniqueTokenNameAndQuantity :: NFTPropertyViolationMsg -> CurrencySymbol -> Value -> (TokenName, Quantity)
+getUniqueTokenNameAndQuantity NFTPropertyViolationMsg{..} c =
+    \case
+        [] -> propertyViolation whenNoNFT
+        [(tn, quantity)] -> (tn, quantity)
+        _ -> propertyViolation whenMultipleTokenNamesForSameCurrencySymbol
+        . getTokenNamesAndQuantities c
+
+{-# INLINEABLE getTokenNamesAndQuantities #-}
+getTokenNamesAndQuantities :: CurrencySymbol -> Value -> [(TokenName, Quantity)]
+getTokenNamesAndQuantities givenCurrencySymbol (Value value) =
+    maybe
+        []
+        ((fmap . fmap) convertToQuantity . Map.toList)
+        (Map.lookup givenCurrencySymbol value)
+
+{-# INLINEABLE convertToQuantity #-}
+convertToQuantity :: Integer -> Quantity
+convertToQuantity x
+    | x <= 0 = propertyViolation "Ledger Property - Quantity can't be negative or zero"
+    | 1 == x = One
+    | otherwise = MoreThanOne
+
+{-# INLINEABLE enopNFTNameGivenToUniqueAndOnlyOperator #-}
+enopNFTNameGivenToUniqueAndOnlyOperator :: CurrencySymbol -> TxInfo -> TokenName
+enopNFTNameGivenToUniqueAndOnlyOperator enopNFTCurrencySymbol =
+    let nftPropertyViolationMsgs@NFTPropertyViolationMsg{..} =
+            NFTPropertyViolationMsg
+                { whenNoNFT = "2.0.0"
+                , whenQuantityMoreThanOne = "1.0.2"
+                , whenMultipleTokenNamesForSameCurrencySymbol = "1.1.1"
+                }
+     in \case
+            (enopTokenName, One) -> enopTokenName
+            (_, MoreThanOne) -> propertyViolation whenQuantityMoreThanOne
+            . getUniqueTokenNameAndQuantity nftPropertyViolationMsgs enopNFTCurrencySymbol
+            . getValuePaidByUniqueSigner
+
+{-# INLINEABLE enopNFTNameSpentByUniqueOperator #-}
+enopNFTNameSpentByUniqueOperator :: CurrencySymbol -> TxInfo -> TokenName
+enopNFTNameSpentByUniqueOperator enopNFTCurrencySymbol =
+    let nftPropertyViolationMsgs@NFTPropertyViolationMsg{..} =
+            NFTPropertyViolationMsg
+                { whenNoNFT = "2.0.0"
+                , whenQuantityMoreThanOne = "1.0.2"
+                , whenMultipleTokenNamesForSameCurrencySymbol = "1.1.1"
+                }
+     in \case
+            (enopTokenName, One) -> enopTokenName
+            (_, MoreThanOne) -> propertyViolation whenQuantityMoreThanOne
+            . getUniqueTokenNameAndQuantity nftPropertyViolationMsgs enopNFTCurrencySymbol
+            . valueSpent
+
 
 {-# INLINEABLE canUnregister #-}
-canUnregister :: ENNFTCurrencySymbol -> RegistrationDatum -> ScriptContext -> Bool
-canUnregister ENNFTCurrencySymbol{..} RegistrationDatum{..} ctx
+canUnregister :: RegistrationValidatorSettings -> RegistrationDatum -> ScriptContext -> Bool
+canUnregister RegistrationValidatorSettings{..} RegistrationDatum{..} ctx
     -- No UTxO's to the script are allowed
     | noScriptOutputs $ txInfoOutputs info
     , -- the ENOPNFT must be burnt in this transaction
@@ -227,12 +336,13 @@ canUnregister ENNFTCurrencySymbol{..} RegistrationDatum{..} ctx
             checkInput h && noScriptOutputs t
 
 {-# INLINEABLE mkValidatorFunction #-}
-mkValidatorFunction :: ENNFTCurrencySymbol -> RegistrationDatum -> RegistrationAction -> ScriptContext -> Bool
-mkValidatorFunction sp d Unregister ctx = canUnregister sp d ctx
-mkValidatorFunction sp _ (Update bs) ctx = canUpdateRegistration sp bs ctx
+mkValidatorFunction :: RegistrationValidatorSettings -> RegistrationDatum -> RegistrationAction -> ScriptContext -> Bool
+mkValidatorFunction registrationValidatorSettings _ UpdateRegistrationDetails ctx = canUpdateRegistration registrationValidatorSettings ctx
+mkValidatorFunction registrationValidatorSettings datum Unregister ctx = canUnregister registrationValidatorSettings datum ctx
+
 
 {-# INLINEABLE mkUntypedValidatorFunction #-}
-mkUntypedValidatorFunction :: ENNFTCurrencySymbol -> BuiltinData -> BuiltinData -> BuiltinData -> ()
+mkUntypedValidatorFunction :: RegistrationValidatorSettings -> BuiltinData -> BuiltinData -> BuiltinData -> ()
 mkUntypedValidatorFunction s d r c =
     check
         ( mkValidatorFunction

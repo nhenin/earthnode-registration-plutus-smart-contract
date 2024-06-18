@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Register.Spec (
+module Specifications (
     specs,
 ) where
 
@@ -91,6 +91,9 @@ import Test.Tasty.QuickCheck (
     testProperty,
     vector,
  )
+import Update.TxBuilding (update)
+import Cardano.Api.Ledger (Anchor(anchorDataHash))
+
 
 specs :: (ContextDSIGN a ~ (), DSIGNAlgorithm a, Signable a ByteString) => [KeyPair a] -> TestTree
 specs keys =
@@ -98,20 +101,22 @@ specs keys =
         "Registration Specifications"
         [ testGroup
             "Nominal Cases"
-            [ testProperty "Register" $
+            [ 
+                -- testProperty "Register" $
+                -- forAll (genFixtureNominalCase keys) $
+                --     \FixtureNominalCase{..} ->
+                --         testSucceedsFrom @Property
+                --             def
+                --             genesis
+                --             $ register substrateKeyPair ennft commission operator
+            testProperty "Update" $
                 forAll (genFixtureNominalCase keys) $
                     \FixtureNominalCase{..} ->
                         testSucceedsFrom @Property
                             def
-                            genesis
-                            $ register substrateKeyPair ennft commission operator
-            , testProperty "Update" $
-                forAll (genFixtureNominalCase keys) $
-                    \FixtureNominalCase{..} ->
-                        testSucceedsFrom @Property
-                            def
-                            genesis
-                            $ register substrateKeyPair ennft commission operator
+                            genesis $ do 
+                                registrationReference <- register substrateKeyPair ennft commission operator
+                                update substrateKeyPair registrationReference commission operator anotherOperator
             ]
         , testGroup
             "Property 1 : Non Fungible Property Transitivity : EN Token is an NFT => the ENOP Token should be an NFT "

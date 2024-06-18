@@ -45,7 +45,12 @@ import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.List.NonEmpty qualified as NL
 import Data.Text qualified as Text
-import OnChainRegistrationValidator (ENNFTCurrencySymbol (..), RegistrationDatum (..), mkHashedRegistrationMessage)
+import OnChainRegistrationValidator
+    ( RegistrationValidatorSettings(..),
+      RegistrationDatum(..),
+      mkHashedRegistrationMessage,
+      RegistrationAction(Unregister),
+      RegistrationAction(..) )
 import PlutusLedgerApi.V1.Value qualified as Value
 import PlutusLedgerApi.V3 (BuiltinByteString, CurrencySymbol, PubKeyHash, TokenName, fromBuiltin, toBuiltin, toBuiltinData)
 import PlutusLedgerApi.V3 qualified as Api
@@ -70,6 +75,10 @@ nfts c tns = V3.Value $ PMap.singleton c (PMap.fromList $ (,1) <$> tns)
 instance PrettyCooked Action where
     prettyCookedOpt opts Mint = "Mint ENNOPNFT"
     prettyCookedOpt opts Burn = "Burn ENNOPNFT"
+
+instance PrettyCooked RegistrationAction where
+    prettyCookedOpt opts UpdateRegistrationDetails = "UpdateRegistrationDetails"
+    prettyCookedOpt opts Unregister = "Unregister"
 
 instance PrettyCooked RegistrationDatum where
     prettyCookedOpt opts RegistrationDatum{..} =
