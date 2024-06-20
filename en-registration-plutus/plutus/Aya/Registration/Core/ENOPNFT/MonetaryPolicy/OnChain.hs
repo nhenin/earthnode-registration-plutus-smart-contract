@@ -41,7 +41,11 @@ import Prelude qualified
 
 import Adapter.Plutus.OnChain
 import Aya.Registration.Core.Property.Violation
-import Aya.Registration.Core.Validator.OnChain
+import Aya.Registration.Core.Validator.OnChain (
+    checkRegistrationSignature,
+    getENOPNFTTokenName,
+    getRegistrationDatumAndENNFTTokenNameOutput,
+ )
 import Plutus.Script.Utils.Scripts (ValidatorHash (..))
 import Plutus.Script.Utils.Value (flattenValue, valueOf)
 import PlutusLedgerApi.V3 (
@@ -85,6 +89,34 @@ instance Eq Action where
 PlutusTx.makeIsDataIndexed ''Action [('Mint, 0), ('Burn, 1)]
 PlutusTx.makeLift ''Action
 
+{-# INLINEABLE mkMoneterayPolicyFunction #-}
+mkMoneterayPolicyFunction :: MonetaryPolicySettings -> Action -> ScriptContext -> Bool
+mkMoneterayPolicyFunction sp Mint ctx = canMintENOPNFT sp (ownCurrencySymbol ctx) (scriptContextTxInfo ctx)
+mkMoneterayPolicyFunction _ Burn ctx = validateUnregister (ownCurrencySymbol ctx) (scriptContextTxInfo ctx)
+
+{-# INLINEABLE mkUntypedMintingPolicyFunction #-}
+mkUntypedMintingPolicyFunction :: MonetaryPolicySettings -> BuiltinData -> BuiltinData -> ()
+mkUntypedMintingPolicyFunction settings r c =
+    check
+        ( mkMoneterayPolicyFunction
+            settings
+            (unsafeFromBuiltinData r)
+            (unsafeFromBuiltinData c)
+        )
+
+{-# INLINEABLE canMintENOPNFT #-}
+canMintENOPNFT :: MonetaryPolicySettings -> CurrencySymbol -> TxInfo -> Bool
+canMintENOPNFT MonetaryPolicySettings{..} enopNFTCurrencySymbol txInfo =
+    ( \(registrationDatum, ennftTokenName) ->
+        propertyViolationIfFalse prop_1_1_0_enopAndEnNFTWithDifferentName (ennftTokenName == getENOPNFTTokenName enopNFTCurrencySymbol txInfo)
+            && propertyViolationIfFalse prop_3_0_InvalidSignature (checkRegistrationSignature registrationDatum)
+            && propertyViolationIfFalse prop_1_1_2_MultipleENOPTokenNamesForSameCurrencySymbol (ennftTokenName == tokenNameGivenToUniqueAndOnlySigner enopNFTCurrencySymbol txInfo)
+    )
+        . getRegistrationDatumAndENNFTTokenNameOutput registrationValidatorHash ennftCurrencySymbol
+        $ txInfo
+
+---- Below needs to be refined
+
 {-# INLINEABLE validateUnregister #-}
 validateUnregister :: CurrencySymbol -> TxInfo -> Bool
 validateUnregister ocs info
@@ -103,17 +135,6 @@ enOpBurnt cs v info =
             Nothing -> 0
      in
         burn_amt == -1
-
-{-# INLINEABLE canMintENOPNFT #-}
-canMintENOPNFT :: MonetaryPolicySettings -> CurrencySymbol -> TxInfo -> Bool
-canMintENOPNFT MonetaryPolicySettings{..} enopNFTCurrencySymbol txInfo =
-    ( \(registrationDatum, ennftTokenName) ->
-        propertyViolationIfFalse prop_1_1_0_enopAndEnNFTWithDifferentName (ennftTokenName == getENOPNFTTokenName enopNFTCurrencySymbol txInfo)
-            && propertyViolationIfFalse prop_3_0_InvalidSignature (checkRegistrationSignature registrationDatum)
-            && propertyViolationIfFalse prop_1_1_2_MultipleENOPTokenNamesForSameCurrencySymbol (ennftTokenName == enopNFTNameGivenToUniqueAndOnlyOperator enopNFTCurrencySymbol txInfo)
-    )
-        . getRegistrationDatumAndENNFTTokenNameOutput registrationValidatorHash ennftCurrencySymbol
-        $ txInfo
 
 {-- getTokenName --}
 -- We determine the TokenName from the input of the registration smart contract,
@@ -134,18 +155,3 @@ getTokenName' is cs =
         case os is of
             [h] -> h
             _ -> traceError "more than one registration input or none"
-
-{-# INLINEABLE mkMoneterayPolicyFunction #-}
-mkMoneterayPolicyFunction :: MonetaryPolicySettings -> Action -> ScriptContext -> Bool
-mkMoneterayPolicyFunction sp Mint ctx = canMintENOPNFT sp (ownCurrencySymbol ctx) (scriptContextTxInfo ctx)
-mkMoneterayPolicyFunction _ Burn ctx = validateUnregister (ownCurrencySymbol ctx) (scriptContextTxInfo ctx)
-
-{-# INLINEABLE mkUntypedMintingPolicyFunction #-}
-mkUntypedMintingPolicyFunction :: MonetaryPolicySettings -> BuiltinData -> BuiltinData -> ()
-mkUntypedMintingPolicyFunction settings r c =
-    check
-        ( mkMoneterayPolicyFunction
-            settings
-            (unsafeFromBuiltinData r)
-            (unsafeFromBuiltinData c)
-        )
