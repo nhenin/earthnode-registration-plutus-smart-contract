@@ -16,7 +16,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:conservative-optimisation #-}
 
-module ENOPNFT.MonetaryPolicy (
+module Aya.Registration.Core.ENOPNFT.MonetaryPolicy.Builder (
     mkMonetaryPolicy,
     mkMonetaryPolicySerialisedScript,
     mkMonetaryPolicyScriptCBOREncoded,
@@ -31,12 +31,16 @@ import PlutusTx (applyCode, compile, liftCodeDef)
 
 import Data.Either (Either (Left, Right))
 
+import Aya.Registration.Core.ENOPNFT.MonetaryPolicy.OnChain (Action (..), MonetaryPolicySettings (..), mkMoneterayPolicyFunction, mkUntypedMintingPolicyFunction)
 import Data.ByteString (ByteString)
 import Data.ByteString.Short (fromShort)
-import ENOPNFT.OnChainMonetaryPolicy (Action (..), MonetaryPolicySettings (..), mkMoneterayPolicyFunction, mkUntypedMintingPolicyFunction)
-import PlutusLedgerApi.V3
+import PlutusLedgerApi.V3 (
+    BuiltinData,
+    SerialisedScript,
+    serialiseCompiledCode,
+ )
 import qualified PlutusLedgerApi.V3 as Script
-import PlutusTx.Code
+import PlutusTx.Code (CompiledCode, unsafeApplyCode)
 import qualified Prelude as Haskell
 
 mkMonetaryPolicy :: MonetaryPolicySettings -> Script.Versioned Script.MintingPolicy

@@ -1,23 +1,17 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:conservative-optimisation #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE ImportQualifiedPost #-}
 
 module Adapter.Plutus.OnChain (
     propertyViolation,
@@ -35,20 +29,19 @@ import PlutusTx.Prelude
 import Plutus.Script.Utils.Value
 import PlutusLedgerApi.V3
 
-import PlutusTx.Applicative ()
+import Aya.Registration.Core.Property.Violation
 import PlutusLedgerApi.V3.Contexts (valuePaidTo)
-import Specifications
+import PlutusTx.Applicative ()
 
-
--- | This function is normally available in the PlutusTx.Maybe module
--- | But its behaviour is unexpected and so it has been redefined here
-
+{- | This function is normally available in the PlutusTx.Maybe module
+| But its behaviour is unexpected and so it has been redefined here
+-}
 {-# INLINEABLE fromMaybe' #-}
 fromMaybe' :: a -> Maybe a -> a
-fromMaybe' d 
-    = \case 
+fromMaybe' d =
+    \case
         Nothing -> d
-        Just v  -> v
+        Just v -> v
 
 {-# INLINEABLE propertyViolation #-}
 propertyViolation :: BuiltinString -> a
@@ -58,32 +51,31 @@ propertyViolation = traceError
 propertyViolationIfFalse :: BuiltinString -> Bool -> Bool
 propertyViolationIfFalse = traceIfFalse
 
-
 {-# INLINEABLE findOwnInput #-}
 findOwnInput :: ScriptContext -> Maybe TxInInfo
 findOwnInput
-  ScriptContext
-    { scriptContextTxInfo = TxInfo{txInfoInputs}
-    , scriptContextPurpose = Spending txOutRef
-    } =
-    find
-      (\TxInInfo{txInInfoOutRef} -> txInInfoOutRef == txOutRef)
-      txInfoInputs
+    ScriptContext
+        { scriptContextTxInfo = TxInfo{txInfoInputs}
+        , scriptContextPurpose = Spending txOutRef
+        } =
+        find
+            (\TxInInfo{txInInfoOutRef} -> txInInfoOutRef == txOutRef)
+            txInfoInputs
 findOwnInput _ = Nothing
 
 -- | Get the validator and datum hashes of the output that is curently being validated
 {-# INLINEABLE ownHash #-}
 ownHash :: ScriptContext -> ScriptHash
 ownHash
-  ( findOwnInput ->
-      Just
-        TxInInfo
-          { txInInfoResolved =
-            TxOut
-              { txOutAddress = Address (ScriptCredential s) _
-              }
-          }
-    ) = s
+    ( findOwnInput ->
+            Just
+                TxInInfo
+                    { txInInfoResolved =
+                        TxOut
+                            { txOutAddress = Address (ScriptCredential s) _
+                            }
+                    }
+        ) = s
 ownHash _ = traceError "Lg" -- "Can't get validator and datum hashes"
 
 {-# INLINEABLE outputsAt #-}
@@ -91,9 +83,9 @@ ownHash _ = traceError "Lg" -- "Can't get validator and datum hashes"
 -- | Get the datums and values paid to an address by a pending transaction.
 outputsAt :: Address -> TxInfo -> [(OutputDatum, Value)]
 outputsAt addr p =
-  let flt TxOut{txOutAddress, txOutValue, txOutDatum} | txOutAddress == addr = Just (txOutDatum, txOutValue)
-      flt _ = Nothing
-   in mapMaybe flt (txInfoOutputs p)
+    let flt TxOut{txOutAddress, txOutValue, txOutDatum} | txOutAddress == addr = Just (txOutDatum, txOutValue)
+        flt _ = Nothing
+     in mapMaybe flt (txInfoOutputs p)
 
 {-# INLINEABLE scriptOutputsAt #-}
 
@@ -106,7 +98,7 @@ getValuePaidByUniqueSigner :: TxInfo -> Value
 getValuePaidByUniqueSigner txInfo =
     valuePaidTo txInfo
         . getUniqueSigner
-        $ txInfo 
+        $ txInfo
 
 {-# INLINEABLE getUniqueSigner #-}
 getUniqueSigner :: TxInfo -> PubKeyHash

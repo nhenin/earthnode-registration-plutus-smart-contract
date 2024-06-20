@@ -23,7 +23,7 @@
 
 {-# HLINT ignore "Use second" #-}
 
-module ENOPNFT.OnChainMonetaryPolicy (
+module Aya.Registration.Core.ENOPNFT.MonetaryPolicy.OnChain (
     mkMoneterayPolicyFunction,
     mkUntypedMintingPolicyFunction,
     MonetaryPolicySettings (..),
@@ -40,14 +40,21 @@ import GHC.Generics (Generic)
 import Prelude qualified
 
 import Adapter.Plutus.OnChain
-import OnChainRegistrationValidator 
+import Aya.Registration.Core.Property.Violation
+import Aya.Registration.Core.Validator.OnChain
 import Plutus.Script.Utils.Scripts (ValidatorHash (..))
 import Plutus.Script.Utils.Value (flattenValue, valueOf)
-import PlutusLedgerApi.V3
+import PlutusLedgerApi.V3 (
+    CurrencySymbol,
+    ScriptContext (scriptContextTxInfo),
+    ScriptHash,
+    TokenName,
+    TxInInfo (txInInfoResolved),
+    TxInfo (txInfoInputs, txInfoMint),
+    TxOut (txOutValue),
+    Value,
+ )
 import PlutusLedgerApi.V3.Contexts (ownCurrencySymbol)
-import Specifications
-
-
 
 data MonetaryPolicySettings = MonetaryPolicySettings
     { ennftCurrencySymbol :: CurrencySymbol
@@ -100,15 +107,13 @@ enOpBurnt cs v info =
 {-# INLINEABLE canMintENOPNFT #-}
 canMintENOPNFT :: MonetaryPolicySettings -> CurrencySymbol -> TxInfo -> Bool
 canMintENOPNFT MonetaryPolicySettings{..} enopNFTCurrencySymbol txInfo =
-    (\(registrationDatum, ennftTokenName) ->
-               propertyViolationIfFalse prop_1_1_0_enopAndEnNFTWithDifferentName               ( ennftTokenName ==  getENOPNFTTokenName enopNFTCurrencySymbol txInfo)
-            && propertyViolationIfFalse prop_3_0_InvalidSignature                              (checkRegistrationSignature registrationDatum)
-            && propertyViolationIfFalse prop_1_1_2_MultipleENOPTokenNamesForSameCurrencySymbol (ennftTokenName == enopNFTNameGivenToUniqueAndOnlyOperator enopNFTCurrencySymbol txInfo))
-    . getRegistrationDatumAndENNFTTokenNameOutput registrationValidatorHash ennftCurrencySymbol
-    $ txInfo
-
-
-
+    ( \(registrationDatum, ennftTokenName) ->
+        propertyViolationIfFalse prop_1_1_0_enopAndEnNFTWithDifferentName (ennftTokenName == getENOPNFTTokenName enopNFTCurrencySymbol txInfo)
+            && propertyViolationIfFalse prop_3_0_InvalidSignature (checkRegistrationSignature registrationDatum)
+            && propertyViolationIfFalse prop_1_1_2_MultipleENOPTokenNamesForSameCurrencySymbol (ennftTokenName == enopNFTNameGivenToUniqueAndOnlyOperator enopNFTCurrencySymbol txInfo)
+    )
+        . getRegistrationDatumAndENNFTTokenNameOutput registrationValidatorHash ennftCurrencySymbol
+        $ txInfo
 
 {-- getTokenName --}
 -- We determine the TokenName from the input of the registration smart contract,

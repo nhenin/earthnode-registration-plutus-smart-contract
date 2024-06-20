@@ -9,7 +9,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:conservative-optimisation #-}
 
-module RegistrationValidator (
+module Aya.Registration.Core.Validator.Builder (
     typedRegistrationValidator,
     associatedENOPNFTMonetaryPolicySettings,
     associatedENOPNFTMonetaryPolicy,
@@ -19,16 +19,16 @@ module RegistrationValidator (
     mkRegistrationScriptScriptCBOREncoded,
 ) where
 
+import Aya.Registration.Core.ENOPNFT.MonetaryPolicy.Builder qualified as ENNOPNFT (currencySymbol, mkMonetaryPolicy)
+import Aya.Registration.Core.ENOPNFT.MonetaryPolicy.OnChain (MonetaryPolicySettings (..))
 import Data.Either (Either (Left, Right))
 import Data.Function (flip, ($), (.))
 import Data.List ((++))
-import ENOPNFT.MonetaryPolicy qualified as ENNOPNFT (currencySymbol, mkMonetaryPolicy)
-import ENOPNFT.OnChainMonetaryPolicy (MonetaryPolicySettings (..))
 
-import OnChainRegistrationValidator (
-    RegistrationValidatorSettings (..),
+import Aya.Registration.Core.Validator.OnChain (
     RegistrationAction,
     RegistrationDatum,
+    RegistrationValidatorSettings (..),
     mkUntypedValidatorFunction,
     mkValidatorFunction,
  )
@@ -40,18 +40,22 @@ import Data.ByteString.Short (fromShort)
 import Plutus.Script.Utils.Scripts qualified as Script (mkValidatorScript)
 import Plutus.Script.Utils.Typed qualified as Script hiding (validatorHash)
 import Plutus.Script.Utils.V3.Scripts qualified as Script
-import PlutusLedgerApi.V3 (SerialisedScript, serialiseCompiledCode)
+import PlutusLedgerApi.V3 (
+    ScriptHash (..),
+    SerialisedScript,
+    serialiseCompiledCode,
+ )
 import PlutusLedgerApi.V3 qualified as Script
-import PlutusTx
-    ( BuiltinData,
-      CompiledCode,
-      unsafeApplyCode,
-      applyCode,
-      liftCodeDef,
-      compile )
+import PlutusTx (
+    BuiltinData,
+    CompiledCode,
+    applyCode,
+    compile,
+    liftCodeDef,
+    unsafeApplyCode,
+ )
 
-import Plutus.Script.Utils.Scripts (ValidatorHash(getValidatorHash))
-import PlutusLedgerApi.V3 (ScriptHash(..))
+import Plutus.Script.Utils.Scripts (ValidatorHash (getValidatorHash))
 
 data RegistrationScript
 

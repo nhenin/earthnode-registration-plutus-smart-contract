@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Register.Fixture (
+module Specs.Aya.Registration.Core.Register.Fixture (
     FixtureNominalCase (..),
     genFixtureNominalCase,
     FixtureENNFTWithWrongQuantityAbove1 (..),
@@ -48,8 +48,8 @@ import Data.Foldable (Foldable (..))
 import Data.List.NonEmpty qualified as NL
 import Data.String (IsString (fromString))
 
-import Model
-import OnChainRegistrationValidator
+import Aya.Registration.Core.Validator.Builder
+import Aya.Registration.Core.Validator.OnChain
 import PlutusLedgerApi.V3 (
     CurrencySymbol (CurrencySymbol),
     TokenName (TokenName),
@@ -58,7 +58,7 @@ import PlutusLedgerApi.V3 (
     singleton,
     toBuiltin,
  )
-import RegistrationValidator
+import Specs.Aya.Registration.Core.Model
 
 instance Show InitialDistribution where
     show (InitialDistribution xs) = "InitialDistribution : " ++ show xs

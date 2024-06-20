@@ -26,11 +26,11 @@ library
   exposed-modules:
     Adapter.Plutus.OffChain
     Adapter.Plutus.OnChain
-    ENOPNFT.MonetaryPolicy
-    ENOPNFT.OnChainMonetaryPolicy
-    OnChainRegistrationValidator
-    RegistrationValidator
-    Specifications
+    Aya.Registration.Core.ENOPNFT.MonetaryPolicy.Builder
+    Aya.Registration.Core.ENOPNFT.MonetaryPolicy.OnChain
+    Aya.Registration.Core.Property.Violation
+    Aya.Registration.Core.Validator.Builder
+    Aya.Registration.Core.Validator.OnChain
 
   build-depends:
     , aeson
@@ -48,11 +48,11 @@ test-suite en-registration-unit-tests
   main-is:            Main.hs
   other-modules:
     Adapter.CardanoCryptoClass.Crypto
-    Model
-    Register.Fixture
-    Specifications
-    Register.TxBuilding
-    Update.TxBuilding
+    Specs.Aya.Registration.Core.Model
+    Specs.Aya.Registration.Core.Register.Fixture
+    Specs.Aya.Registration.Core.Register.TxBuilding
+    Specs.Aya.Registration.Core.Specifications
+    Specs.Aya.Registration.Core.Update.TxBuilding
 
   build-depends:
     , aeson
@@ -71,11 +71,11 @@ test-suite en-registration-unit-tests
     , plutus-ledger-api
     , plutus-script-utils
     , plutus-tx
+    , safe
     , tasty
     , tasty-hunit
     , tasty-quickcheck
     , text
-    , safe
 
   build-tool-depends: hspec-discover:hspec-discover
   ghc-options:        -threaded

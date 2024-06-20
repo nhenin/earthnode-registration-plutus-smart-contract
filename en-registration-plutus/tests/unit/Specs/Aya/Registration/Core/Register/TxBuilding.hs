@@ -1,10 +1,11 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Register.TxBuilding (
+module Specs.Aya.Registration.Core.Register.TxBuilding (
     register,
     -- Pushing Fungible Tokens instead of NFTs
     registerMintingAnENOPWithQuantityAbove1,
@@ -41,29 +42,35 @@ import Data.Map.NonEmpty (NEMap)
 import Data.Map.NonEmpty qualified as NEMap
 import PlutusTx.AssocMap qualified as PMap
 
+import Aya.Registration.Core.ENOPNFT.MonetaryPolicy.OnChain (Action (..))
 import Data.Set (Set)
 import Data.Set qualified as Set
-import ENOPNFT.OnChainMonetaryPolicy (Action (..))
 import Plutus.Script.Utils.Scripts qualified as Script
 
 import Adapter.CardanoCryptoClass.Crypto
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.ByteString (ByteString)
 
+import Aya.Registration.Core.Validator.Builder (
+    associatedENOPNFTCurrencySymbol,
+    associatedENOPNFTMonetaryPolicy,
+    typedRegistrationValidator,
+ )
+import Aya.Registration.Core.Validator.OnChain (RegistrationDatum (..), RegistrationValidatorSettings (..), mkHashedRegistrationMessage)
 import Data.List.NonEmpty qualified as NL
 import Data.Text qualified as Text
-import Model
-import OnChainRegistrationValidator (RegistrationValidatorSettings (..), RegistrationDatum (..), mkHashedRegistrationMessage)
 import PlutusLedgerApi.V1.Value qualified as Value
 import PlutusLedgerApi.V3 (BuiltinByteString, CurrencySymbol, PubKeyHash, TokenName, fromBuiltin, toBuiltin, toBuiltinData)
 import PlutusLedgerApi.V3 qualified as Api
 import PlutusLedgerApi.V3 qualified as V3
 import Prettyprinter.Extras (Pretty (..))
-import RegistrationValidator (
-    associatedENOPNFTCurrencySymbol,
-    associatedENOPNFTMonetaryPolicy,
-    typedRegistrationValidator,
- )
+import Specs.Aya.Registration.Core.Model
+
+data RegisterLabel = RegisterLabel
+    deriving (Eq, Show, Ord)
+
+instance PrettyCooked RegisterLabel where
+    prettyCooked _ = "RegisterLabel"
 
 register ::
     (ContextDSIGN a ~ (), DSIGNAlgorithm a, Signable a ByteString) =>
@@ -72,7 +79,7 @@ register ::
     ENNFT ->
     Commission ->
     Wallet ->
-    m (RegistrationValidatorSettings,ENOPNFT)
+    m (RegistrationValidatorSettings, ENOPNFT)
 register keyPair ennft commission operator = do
     let settings = RegistrationValidatorSettings . currencySymbol $ ennft
         signedMessage =
@@ -89,7 +96,7 @@ register keyPair ennft commission operator = do
         validateTxSkel $
             txSkelTemplate
                 { txSkelMints = txSkelMintsFromList [(associatedENOPNFTMonetaryPolicy settings, SomeMintsRedeemer Mint, tokenName ennft, 1)]
-                , txSkelLabel = Set.empty
+                , txSkelLabel = Set.singleton $ TxLabel RegisterLabel
                 , txSkelOpts = def{txOptEnsureMinAda = True}
                 , txSkelValidityRange = Api.always
                 , txSkelSigners = [operator]
@@ -113,8 +120,8 @@ register keyPair ennft commission operator = do
                         (V3.singleton (currencySymbol ennft) (tokenName ennft) 1)
                     ]
                 }
-    
-    return (settings,NFT (associatedENOPNFTCurrencySymbol settings) (tokenName ennft))
+
+    return (settings, NFT (associatedENOPNFTCurrencySymbol settings) (tokenName ennft))
 
 registerMintingAnENOPWithQuantityAbove1 ::
     (ContextDSIGN a ~ (), DSIGNAlgorithm a, Signable a ByteString) =>

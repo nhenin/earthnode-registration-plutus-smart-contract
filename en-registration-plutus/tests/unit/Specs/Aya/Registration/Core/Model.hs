@@ -6,7 +6,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Model (
+module Specs.Aya.Registration.Core.Model (
     ENNFT (..),
     ENOPNFT (..),
     NFT (..),
@@ -30,9 +30,9 @@ import Data.Map.NonEmpty (NEMap)
 import Data.Map.NonEmpty qualified as NEMap
 import PlutusTx.AssocMap qualified as PMap
 
+import Aya.Registration.Core.ENOPNFT.MonetaryPolicy.OnChain (Action (..))
 import Data.Set (Set)
 import Data.Set qualified as Set
-import ENOPNFT.OnChainMonetaryPolicy (Action (..))
 import Plutus.Script.Utils.Scripts qualified as Script
 
 import Adapter.CardanoCryptoClass.Crypto (
@@ -40,27 +40,27 @@ import Adapter.CardanoCryptoClass.Crypto (
     FromByteString (fromByteString),
     Hexadecimal,
  )
+import Aya.Registration.Core.Validator.Builder (
+    associatedENOPNFTCurrencySymbol,
+    associatedENOPNFTMonetaryPolicy,
+    typedRegistrationValidator,
+ )
+import Aya.Registration.Core.Validator.OnChain (
+    RegistrationAction (..),
+    RegistrationDatum (..),
+    RegistrationValidatorSettings (..),
+    mkHashedRegistrationMessage,
+ )
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.List.NonEmpty qualified as NL
 import Data.Text qualified as Text
-import OnChainRegistrationValidator
-    ( RegistrationValidatorSettings(..),
-      RegistrationDatum(..),
-      mkHashedRegistrationMessage,
-      RegistrationAction(Unregister),
-      RegistrationAction(..) )
 import PlutusLedgerApi.V1.Value qualified as Value
 import PlutusLedgerApi.V3 (BuiltinByteString, CurrencySymbol, PubKeyHash, TokenName, fromBuiltin, toBuiltin, toBuiltinData)
 import PlutusLedgerApi.V3 qualified as Api
 import PlutusLedgerApi.V3 qualified as V3
 import Prettyprinter.Extras (Pretty (..))
-import RegistrationValidator (
-    associatedENOPNFTCurrencySymbol,
-    associatedENOPNFTMonetaryPolicy,
-    typedRegistrationValidator,
- )
 
 data NFT = NFT {currencySymbol :: CurrencySymbol, tokenName :: TokenName} deriving (Eq, Show)
 type ENNFT = NFT

@@ -16,7 +16,7 @@
 
 {-# HLINT ignore "Use second" #-}
 
-module Specifications (
+module Aya.Registration.Core.Property.Violation (
     getHumanReadableSpecViolation,
     NFTPropertyViolationMsg (..),
     mkENOPNFTPropertyViolationMsg,
@@ -29,10 +29,10 @@ module Specifications (
     prop_3_2_NoRegistrationDatum,
     prop_3_3_OnlyHashRegistration,
     prop_3_4_MoreThanOneRegistrationOutput,
-    prop_3_5_DatumDeserializationFailed 
+    prop_3_5_DatumDeserializationFailed,
 ) where
 
-import PlutusTx.Prelude
+import PlutusTx.Prelude (BuiltinString)
 
 {- | Get the human readable representation on an Error Message OnChain
 | N.B : This function should be used only for OffChain Logic, It has a double purpose :
@@ -73,7 +73,7 @@ getHumanReadableSpecViolation =
         _ -> "unknown error code"
 
 {-# INLINEABLE prop_1_1_0_enopAndEnNFTWithDifferentName #-}
-{-# INLINABLE prop_1_1_2_MultipleENOPTokenNamesForSameCurrencySymbol #-}
+{-# INLINEABLE prop_1_1_2_MultipleENOPTokenNamesForSameCurrencySymbol #-}
 {-# INLINEABLE prop_2_1_1_SignerIsNotUnique #-}
 {-# INLINEABLE prop_3_0_InvalidSignature #-}
 {-# INLINEABLE prop_3_1_RegistrationScriptNotFound #-}
@@ -100,8 +100,6 @@ prop_3_2_NoRegistrationDatum = "3.2"
 prop_3_3_OnlyHashRegistration = "3.3"
 prop_3_4_MoreThanOneRegistrationOutput = "3.4"
 prop_3_5_DatumDeserializationFailed = "3.5"
-
-
 
 data NFTPropertyViolationMsg = NFTPropertyViolationMsg
     { whenNoNFT :: BuiltinString

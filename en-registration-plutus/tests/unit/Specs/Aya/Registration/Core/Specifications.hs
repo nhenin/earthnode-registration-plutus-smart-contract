@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Specifications (
+module Specs.Aya.Registration.Core.Specifications (
     specs,
 ) where
 
@@ -12,6 +12,7 @@ import Cooked (InitialDistribution (..), Wallet, distributionFromList, interpret
 import Test.Tasty
 
 import Adapter.CardanoCryptoClass.Crypto (ContextDSIGN, DSIGNAlgorithm (Signable), KeyPair)
+import Cardano.Api.Ledger (Anchor (anchorDataHash))
 import Control.Monad.IO.Class
 import Cooked.MockChain qualified as C
 import Cooked.Pretty qualified as C
@@ -31,7 +32,7 @@ import PlutusLedgerApi.V3 (
     singleton,
     toBuiltin,
  )
-import Register.Fixture (
+import Specs.Aya.Registration.Core.Register.Fixture (
     FixtureENNFTWithWrongQuantityAbove1 (
         FixtureENNFTWithWrongQuantityAbove1,
         commission,
@@ -80,7 +81,8 @@ import Register.Fixture (
     genFixtureWithInvalidSignature,
     operator,
  )
-import Register.TxBuilding (mintWithoutRegistrationScript, register, registerAndMintToAnotherOperator, registerByGeneratingMoreThan1ENNFT, registerByGeneratingMoreThan1ENOPNFT, registerMintingAnENOPWithQuantityAbove1, registerMoreThanOneOperator, registerWith2WalletsSigning, registerWithDifferentENandENOPNFTTokenNames, registerWithHashedRegistrationDatum, registerWithInvalidDatumVerification, registerWithNoRegistrationDatum, registerWithanENNFTWithAQuantityAbove1, registerWithoutAnENNFT, registerWithoutSigning)
+import Specs.Aya.Registration.Core.Register.TxBuilding (mintWithoutRegistrationScript, register, registerAndMintToAnotherOperator, registerByGeneratingMoreThan1ENNFT, registerByGeneratingMoreThan1ENOPNFT, registerMintingAnENOPWithQuantityAbove1, registerMoreThanOneOperator, registerWith2WalletsSigning, registerWithDifferentENandENOPNFTTokenNames, registerWithHashedRegistrationDatum, registerWithInvalidDatumVerification, registerWithNoRegistrationDatum, registerWithanENNFTWithAQuantityAbove1, registerWithoutAnENNFT, registerWithoutSigning)
+import Specs.Aya.Registration.Core.Update.TxBuilding (update)
 import Test.Tasty.QuickCheck (
     Gen,
     Property,
@@ -91,30 +93,27 @@ import Test.Tasty.QuickCheck (
     testProperty,
     vector,
  )
-import Update.TxBuilding (update)
-import Cardano.Api.Ledger (Anchor(anchorDataHash))
-
 
 specs :: (ContextDSIGN a ~ (), DSIGNAlgorithm a, Signable a ByteString) => [KeyPair a] -> TestTree
 specs keys =
     testGroup
-        "Registration Specifications"
+        "Registration Specs.Aya.Registration.Core.Specifications"
         [ testGroup
             "Nominal Cases"
-            [ 
-                -- testProperty "Register" $
-                -- forAll (genFixtureNominalCase keys) $
-                --     \FixtureNominalCase{..} ->
-                --         testSucceedsFrom @Property
-                --             def
-                --             genesis
-                --             $ register substrateKeyPair ennft commission operator
-            testProperty "Update" $
+            [ -- testProperty "Register" $
+              -- forAll (genFixtureNominalCase keys) $
+              --     \FixtureNominalCase{..} ->
+              --         testSucceedsFrom @Property
+              --             def
+              --             genesis
+              --             $ register substrateKeyPair ennft commission operator
+              testProperty "Update" $
                 forAll (genFixtureNominalCase keys) $
                     \FixtureNominalCase{..} ->
                         testSucceedsFrom @Property
                             def
-                            genesis $ do 
+                            genesis
+                            $ do
                                 registrationReference <- register substrateKeyPair ennft commission operator
                                 update substrateKeyPair registrationReference commission operator anotherOperator
             ]

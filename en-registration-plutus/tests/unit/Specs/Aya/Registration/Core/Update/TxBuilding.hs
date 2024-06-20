@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Update.TxBuilding (
+module Specs.Aya.Registration.Core.Update.TxBuilding (
     update,
 ) where
 
@@ -22,63 +22,69 @@ import Data.Map.NonEmpty (NEMap)
 import Data.Map.NonEmpty qualified as NEMap
 import PlutusTx.AssocMap qualified as PMap
 
+import Aya.Registration.Core.ENOPNFT.MonetaryPolicy.OnChain (Action (..))
 import Data.Set (Set)
 import Data.Set qualified as Set
-import ENOPNFT.OnChainMonetaryPolicy (Action (..))
 import Plutus.Script.Utils.Scripts qualified as Script
 
 import Adapter.CardanoCryptoClass.Crypto (Codec (decode, encode), DSIGNAlgorithm (..), Ed25519DSIGN, FromByteString (fromByteString), Hexadecimal, KeyPair (signatureKey, verificationKey), ToByteString (toByteString), sign)
+import Aya.Registration.Core.Validator.Builder (
+    associatedENOPNFTCurrencySymbol,
+    associatedENOPNFTMonetaryPolicy,
+    registrationValidatorAddress,
+    typedRegistrationValidator,
+ )
+import Aya.Registration.Core.Validator.OnChain (
+    RegistrationAction (..),
+    RegistrationDatum (..),
+    RegistrationValidatorSettings (..),
+    mkHashedRegistrationMessage,
+ )
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.List.NonEmpty qualified as NL
+import Data.Maybe (fromMaybe)
 import Data.Text qualified as Text
-import Model ( Commission, ENNFT, ENOPNFT, NFT(..) )
-import OnChainRegistrationValidator
-    ( RegistrationValidatorSettings(..),
-      RegistrationDatum(..),
-      mkHashedRegistrationMessage,
-      RegistrationAction(..) )
 import PlutusLedgerApi.V1.Value qualified as Value
-import PlutusLedgerApi.V3
-    ( BuiltinByteString,
-      CurrencySymbol,
-      PubKeyHash,
-      TokenName,
-      fromBuiltin,
-      toBuiltin,
-      toBuiltinData,
-      Value (..),
-      unionWith )
+import PlutusLedgerApi.V3 (
+    BuiltinByteString,
+    CurrencySymbol,
+    PubKeyHash,
+    TokenName,
+    Value (..),
+    fromBuiltin,
+    toBuiltin,
+    toBuiltinData,
+    unionWith,
+ )
 import PlutusLedgerApi.V3 qualified as Api
 import PlutusLedgerApi.V3 qualified as V3
-import Prettyprinter.Extras (Pretty (..))
-import RegistrationValidator
-    ( associatedENOPNFTCurrencySymbol,
-      associatedENOPNFTMonetaryPolicy,
-      typedRegistrationValidator,
-      registrationValidatorAddress )
-import Data.Maybe (fromMaybe)
-import Safe (headMay)
 import PlutusTx.Maybe (isJust)
+import Prettyprinter.Extras (Pretty (..))
+import Safe (headMay)
+import Specs.Aya.Registration.Core.Model (Commission, ENNFT, ENOPNFT, NFT (..))
 
 update ::
     (ContextDSIGN a ~ (), DSIGNAlgorithm a, Signable a ByteString) =>
     (MonadBlockChain m) =>
     KeyPair a ->
-    (RegistrationValidatorSettings,ENOPNFT) ->
+    (RegistrationValidatorSettings, ENOPNFT) ->
     Commission ->
     Wallet ->
     Wallet ->
-    m (RegistrationValidatorSettings,ENOPNFT)
-update keyPair registratedItemId@(settings,enopNFT) newCommission operator newOperator= do
-    registeredItemRef
-        <- (fst
-            . fromMaybe (error "No ENNFT found on registration validator utxos.")
-            . headMay <$>)
-           . runUtxoSearch
-            . flip filterWithPred (containsENNFT registratedItemId. outputValue)
-            . utxosAtSearch $ registrationValidatorAddress settings
+    m (RegistrationValidatorSettings, ENOPNFT)
+update keyPair registratedItemId@(settings, enopNFT) newCommission operator newOperator = do
+    registeredItemRef <-
+        ( fst
+                . fromMaybe (error "No ENNFT found on registration validator utxos.")
+                . headMay
+                <$>
+            )
+            . runUtxoSearch
+            . flip filterWithPred (containsENNFT registratedItemId . outputValue)
+            . utxosAtSearch
+            $ registrationValidatorAddress settings
 
     let signedMessage =
             sign
@@ -120,13 +126,11 @@ update keyPair registratedItemId@(settings,enopNFT) newCommission operator newOp
                 }
     return registratedItemId
 
+getENNFT :: (RegistrationValidatorSettings, ENOPNFT) -> Value
+getENNFT (settings, enopNFT) = V3.singleton (ennftCurrencySymbol settings) (tokenName enopNFT) 1
 
-getENNFT ::  (RegistrationValidatorSettings,ENOPNFT) -> Value
-getENNFT (settings,enopNFT) = V3.singleton (ennftCurrencySymbol settings) (tokenName enopNFT) 1
-
-
-containsENNFT :: (RegistrationValidatorSettings,ENOPNFT) -> Value -> Bool
-containsENNFT (settings,enopNFT) (Value v) =
+containsENNFT :: (RegistrationValidatorSettings, ENOPNFT) -> Value -> Bool
+containsENNFT (settings, enopNFT) (Value v) =
     let currency = ennftCurrencySymbol settings
-        tn =  tokenName enopNFT
-    in isJust (PMap.lookup currency v >>= PMap.lookup tn)
+        tn = tokenName enopNFT
+     in isJust (PMap.lookup currency v >>= PMap.lookup tn)
