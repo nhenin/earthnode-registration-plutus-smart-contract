@@ -24,11 +24,11 @@
 {-# HLINT ignore "Use second" #-}
 
 module Aya.Registration.Core.ENOPNFT.MonetaryPolicy.OnChain (
-    mkMoneterayPolicyFunction,
-    mkUntypedMintingPolicyFunction,
-    MonetaryPolicySettings (..),
-    Action (..),
-    validateUnregister,
+  mkMoneterayPolicyFunction,
+  mkUntypedMintingPolicyFunction,
+  MonetaryPolicySettings (..),
+  Action (..),
+  validateUnregister,
 ) where
 
 import PlutusTx
@@ -39,52 +39,61 @@ import GHC.Generics (Generic)
 
 import Prelude qualified
 
-import Adapter.Plutus.OnChain
-import Aya.Registration.Core.Property.Violation
+import Adapter.Plutus.OnChain (
+  propertyViolationIfFalse,
+  tokenNameGivenToUniqueAndOnlySigner,
+ )
+import Aya.Registration.Core.Property.Datum.Register (v_3_2_Registration_Validator_Datim_Not_Authentic)
+import Aya.Registration.Core.Property.NFT.Transitivity.Register (
+  mkENOP_NFT,
+  v_1_1_0_ENOP_NFT_TokenName_Not_Equal_To_ENNFT_TokenName,
+  v_1_1_1_ENOP_NFT_Cardinality_Above_1,
+ )
 import Aya.Registration.Core.Validator.OnChain (
-    checkRegistrationSignature,
-    getENOPNFTTokenName,
-    getRegistrationDatumAndENNFTTokenNameOutput,
+  RegistrationDatum,
+  checkRegistrationSignature,
+  getENOPNFTTokenName,
+  getRegistrationDatumAndENNFTTokenNameOutput,
  )
 import Plutus.Script.Utils.Scripts (ValidatorHash (..))
 import Plutus.Script.Utils.Value (flattenValue, valueOf)
 import PlutusLedgerApi.V3 (
-    CurrencySymbol,
-    ScriptContext (scriptContextTxInfo),
-    ScriptHash,
-    TokenName,
-    TxInInfo (txInInfoResolved),
-    TxInfo (txInfoInputs, txInfoMint),
-    TxOut (txOutValue),
-    Value,
+  CurrencySymbol,
+  ScriptContext (scriptContextTxInfo),
+  ScriptHash,
+  TokenName,
+  TxInInfo (txInInfoResolved),
+  TxInfo (txInfoInputs, txInfoMint),
+  TxOut (txOutValue),
+  Value,
  )
 import PlutusLedgerApi.V3.Contexts (ownCurrencySymbol)
 
 data MonetaryPolicySettings = MonetaryPolicySettings
-    { ennftCurrencySymbol :: CurrencySymbol
-    , registrationValidatorHash :: ScriptHash
-    }
-    deriving (Prelude.Show, Generic, Ord)
+  { ennftCurrencySymbol :: CurrencySymbol
+  , registrationValidatorHash :: ScriptHash
+  }
+  deriving (Prelude.Show, Generic, Ord)
 
 instance Eq MonetaryPolicySettings where
-    {-# INLINEABLE (==) #-}
-    MonetaryPolicySettings x y == MonetaryPolicySettings x' y' = x == x' && y == y'
+  {-# INLINEABLE (==) #-}
+  MonetaryPolicySettings x y == MonetaryPolicySettings x' y' = x == x' && y == y'
 
 instance Eq ValidatorHash where
-    {-# INLINEABLE (==) #-}
-    ValidatorHash x == ValidatorHash y = x == y
+  {-# INLINEABLE (==) #-}
+  ValidatorHash x == ValidatorHash y = x == y
 
 PlutusTx.unstableMakeIsData ''MonetaryPolicySettings
 PlutusTx.makeLift ''MonetaryPolicySettings
 
 data Action = Mint | Burn
-    deriving (Prelude.Show, Generic, FromJSON, ToJSON, Ord)
+  deriving (Prelude.Show, Generic, FromJSON, ToJSON, Ord)
 
 instance Eq Action where
-    {-# INLINEABLE (==) #-}
-    Mint == Mint = True
-    Burn == Burn = True
-    _ == _ = False
+  {-# INLINEABLE (==) #-}
+  Mint == Mint = True
+  Burn == Burn = True
+  _ == _ = False
 
 PlutusTx.makeIsDataIndexed ''Action [('Mint, 0), ('Burn, 1)]
 PlutusTx.makeLift ''Action
@@ -97,44 +106,57 @@ mkMoneterayPolicyFunction _ Burn ctx = validateUnregister (ownCurrencySymbol ctx
 {-# INLINEABLE mkUntypedMintingPolicyFunction #-}
 mkUntypedMintingPolicyFunction :: MonetaryPolicySettings -> BuiltinData -> BuiltinData -> ()
 mkUntypedMintingPolicyFunction settings r c =
-    check
-        ( mkMoneterayPolicyFunction
-            settings
-            (unsafeFromBuiltinData r)
-            (unsafeFromBuiltinData c)
-        )
+  check
+    ( mkMoneterayPolicyFunction
+        settings
+        (unsafeFromBuiltinData r)
+        (unsafeFromBuiltinData c)
+    )
 
 {-# INLINEABLE canMintENOPNFT #-}
 canMintENOPNFT :: MonetaryPolicySettings -> CurrencySymbol -> TxInfo -> Bool
 canMintENOPNFT MonetaryPolicySettings{..} enopNFTCurrencySymbol txInfo =
-    ( \(registrationDatum, ennftTokenName) ->
-        propertyViolationIfFalse prop_1_1_0_enopAndEnNFTWithDifferentName (ennftTokenName == getENOPNFTTokenName enopNFTCurrencySymbol txInfo)
-            && propertyViolationIfFalse prop_3_0_InvalidSignature (checkRegistrationSignature registrationDatum)
-            && propertyViolationIfFalse prop_1_1_2_MultipleENOPTokenNamesForSameCurrencySymbol (ennftTokenName == tokenNameGivenToUniqueAndOnlySigner enopNFTCurrencySymbol txInfo)
-    )
-        . getRegistrationDatumAndENNFTTokenNameOutput registrationValidatorHash ennftCurrencySymbol
-        $ txInfo
+  canMintENOPNFT' enopNFTCurrencySymbol txInfo
+    $ getRegistrationDatumAndENNFTTokenNameOutput registrationValidatorHash ennftCurrencySymbol txInfo
+
+{-# INLINEABLE canMintENOPNFT' #-}
+canMintENOPNFT' :: CurrencySymbol -> TxInfo -> (RegistrationDatum, TokenName) -> Bool
+canMintENOPNFT' enopNFTCurrencySymbol txInfo (registrationDatum, ennftTokenName) =
+  mustHaveSameENOPAndENTokenNames
+    && mustHaveAnAuthenticRegistrationDatum
+    && mustOutputENOPNFTToOperator
+  where
+    mustHaveSameENOPAndENTokenNames =
+      propertyViolationIfFalse
+        v_1_1_0_ENOP_NFT_TokenName_Not_Equal_To_ENNFT_TokenName
+        (ennftTokenName == getENOPNFTTokenName enopNFTCurrencySymbol txInfo)
+    mustHaveAnAuthenticRegistrationDatum =
+      propertyViolationIfFalse
+        v_3_2_Registration_Validator_Datim_Not_Authentic
+        (checkRegistrationSignature registrationDatum)
+    mustOutputENOPNFTToOperator =
+      propertyViolationIfFalse
+        v_1_1_1_ENOP_NFT_Cardinality_Above_1
+        (ennftTokenName == tokenNameGivenToUniqueAndOnlySigner mkENOP_NFT enopNFTCurrencySymbol txInfo)
 
 ---- Below needs to be refined
 
 {-# INLINEABLE validateUnregister #-}
 validateUnregister :: CurrencySymbol -> TxInfo -> Bool
 validateUnregister ocs info
-    | traceIfFalse "enOpNftBurnt" $ enOpBurnt ocs (txInfoMint info) info = True
-    | otherwise = False
+  | traceIfFalse "enOpNftBurnt" $ enOpBurnt ocs (txInfoMint info) info = True
+  | otherwise = False
 
 {-- enOpBurnt --}
 -- Make sure the Token is burnt
 {-# INLINEABLE enOpBurnt #-}
 enOpBurnt :: CurrencySymbol -> Value -> TxInfo -> Bool
 enOpBurnt cs v info =
-    let
-        tn = getTokenName' (txInfoInputs info) cs
-        burn_amt = case tn of
-            Just tn' -> valueOf v cs tn'
-            Nothing -> 0
-     in
-        burn_amt == -1
+  let tn = getTokenName' (txInfoInputs info) cs
+      burn_amt = case tn of
+        Just tn' -> valueOf v cs tn'
+        Nothing -> 0
+   in burn_amt == -1
 
 {-- getTokenName --}
 -- We determine the TokenName from the input of the registration smart contract,
@@ -142,16 +164,14 @@ enOpBurnt cs v info =
 {-# INLINEABLE getTokenName' #-}
 getTokenName' :: [TxInInfo] -> CurrencySymbol -> Maybe TokenName
 getTokenName' is cs =
-    let
-        filter' :: TxInInfo -> [Maybe TokenName]
-        filter' i = fn $ flattenValue (txOutValue $ txInInfoResolved i)
-          where
-            fn [] = []
-            fn ((cs', tn', amt') : ls) = if cs == cs' && amt' == 1 then [Just tn'] else fn ls
+  let filter' :: TxInInfo -> [Maybe TokenName]
+      filter' i = fn $ flattenValue (txOutValue $ txInInfoResolved i)
+        where
+          fn [] = []
+          fn ((cs', tn', amt') : ls) = if cs == cs' && amt' == 1 then [Just tn'] else fn ls
 
-        os [] = []
-        os (x : xs) = filter' x ++ os xs
-     in
-        case os is of
-            [h] -> h
-            _ -> traceError "more than one registration input or none"
+      os [] = []
+      os (x : xs) = filter' x ++ os xs
+   in case os is of
+        [h] -> h
+        _ -> traceError "more than one registration input or none"

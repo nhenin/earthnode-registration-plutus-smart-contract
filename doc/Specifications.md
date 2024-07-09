@@ -78,10 +78,10 @@ The following information is required as input for the smart contract transactio
       - `1.0.1 violation` - ENNOP Minted Quantity > 1
       - `1.0.2 violation` - No ENNFT on Registration validator output                              
       - `1.0.3 violation` - ENNFT Quantity > 1                         
-  - `Property 1.1` : NFTs Token Names & Cardinality equality : There is 1-1 relationship between the ENNFT and the ENOPNFT
-    - `1.1.0 violation` - ENOPNFT TokenName =/ ENNFT TokenName                   
-    - `1.1.1 violation` - |ENOP NFT| > 1 (Cardinality Violation)                
-    - `1.1.2 violation` - |EN NFT|   > 1 (Cardinality Violation)
+    - `Property 1.1` : NFTs Token Names & Cardinality equality : There is 1-1 relationship between the ENNFT and the ENOPNFT
+      - `1.1.0 violation` - ENOPNFT TokenName =/ ENNFT TokenName                   
+      - `1.1.1 violation` - |ENOP NFT| > 1 (Cardinality Violation)                
+      - `1.1.2 violation` - |EN NFT|   > 1 (Cardinality Violation)
 - **Update** 
   - `Property 1.0` : Tokens Quantities are verified
     - `1.0.0 violation` - No ENNOP as Input

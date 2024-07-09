@@ -17,12 +17,12 @@
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:conservative-optimisation #-}
 
 module Aya.Registration.Core.ENOPNFT.MonetaryPolicy.Builder (
-    mkMonetaryPolicy,
-    mkMonetaryPolicySerialisedScript,
-    mkMonetaryPolicyScriptCBOREncoded,
-    currencySymbol,
-    MonetaryPolicySettings (..),
-    Action (..),
+  mkMonetaryPolicy,
+  mkMonetaryPolicySerialisedScript,
+  mkMonetaryPolicyScriptCBOREncoded,
+  currencySymbol,
+  MonetaryPolicySettings (..),
+  Action (..),
 ) where
 
 import qualified Plutus.Script.Utils.Scripts as Script
@@ -31,13 +31,18 @@ import PlutusTx (applyCode, compile, liftCodeDef)
 
 import Data.Either (Either (Left, Right))
 
-import Aya.Registration.Core.ENOPNFT.MonetaryPolicy.OnChain (Action (..), MonetaryPolicySettings (..), mkMoneterayPolicyFunction, mkUntypedMintingPolicyFunction)
+import Aya.Registration.Core.ENOPNFT.MonetaryPolicy.OnChain (
+  Action (..),
+  MonetaryPolicySettings (..),
+  mkMoneterayPolicyFunction,
+  mkUntypedMintingPolicyFunction,
+ )
 import Data.ByteString (ByteString)
 import Data.ByteString.Short (fromShort)
 import PlutusLedgerApi.V3 (
-    BuiltinData,
-    SerialisedScript,
-    serialiseCompiledCode,
+  BuiltinData,
+  SerialisedScript,
+  serialiseCompiledCode,
  )
 import qualified PlutusLedgerApi.V3 as Script
 import PlutusTx.Code (CompiledCode, unsafeApplyCode)
@@ -45,19 +50,20 @@ import qualified Prelude as Haskell
 
 mkMonetaryPolicy :: MonetaryPolicySettings -> Script.Versioned Script.MintingPolicy
 mkMonetaryPolicy settings =
-    case $$(PlutusTx.compile [||\s -> Script.mkUntypedMintingPolicy (mkMoneterayPolicyFunction s)||]) `PlutusTx.applyCode` PlutusTx.liftCodeDef settings of
-        Left s -> Haskell.error Haskell.$ "Can't apply parameters in validator: " Haskell.++ Haskell.show s
-        Right code -> Haskell.flip Script.Versioned Script.PlutusV3 Haskell.. Script.mkMintingPolicyScript Haskell.$ code
+  case $$(PlutusTx.compile [||\s -> Script.mkUntypedMintingPolicy (mkMoneterayPolicyFunction s)||])
+    `PlutusTx.applyCode` PlutusTx.liftCodeDef settings of
+    Left s -> Haskell.error Haskell.$ "Can't apply parameters in validator: " Haskell.++ Haskell.show s
+    Right code -> Haskell.flip Script.Versioned Script.PlutusV3 Haskell.. Script.mkMintingPolicyScript Haskell.$ code
 
 currencySymbol :: MonetaryPolicySettings -> Script.CurrencySymbol
 currencySymbol settings = Script.scriptCurrencySymbol (mkMonetaryPolicy settings)
 
-appliedMonetaryPolicy ::
-    MonetaryPolicySettings ->
-    CompiledCode (BuiltinData -> BuiltinData -> ())
+appliedMonetaryPolicy
+  :: MonetaryPolicySettings
+  -> CompiledCode (BuiltinData -> BuiltinData -> ())
 appliedMonetaryPolicy params =
-    $$(compile [||mkUntypedMintingPolicyFunction||])
-        `unsafeApplyCode` liftCodeDef params
+  $$(compile [||mkUntypedMintingPolicyFunction||])
+    `unsafeApplyCode` liftCodeDef params
 
 mkMonetaryPolicySerialisedScript :: MonetaryPolicySettings -> SerialisedScript
 mkMonetaryPolicySerialisedScript = serialiseCompiledCode Haskell.. appliedMonetaryPolicy

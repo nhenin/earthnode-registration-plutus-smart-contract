@@ -1,8 +1,8 @@
 cabal-version:      3.0
 name:               en-registration-plutus
 version:            2.0.0.0
-author:             Torben Poguntke
-maintainer:         torben.poguntke@worldmobile.io
+author:             Nicolas Henin
+maintainer:         mr.henin@gmail.com
 copyright:          © 2023 World Mobile Group
 build-type:         Simple
 extra-source-files: CHANGELOG.md
@@ -28,6 +28,9 @@ library
     Adapter.Plutus.OnChain
     Aya.Registration.Core.ENOPNFT.MonetaryPolicy.Builder
     Aya.Registration.Core.ENOPNFT.MonetaryPolicy.OnChain
+    Aya.Registration.Core.Property.Datum.Register
+    Aya.Registration.Core.Property.NFT.Ownership.Register
+    Aya.Registration.Core.Property.NFT.Transitivity.Register
     Aya.Registration.Core.Property.Violation
     Aya.Registration.Core.Validator.Builder
     Aya.Registration.Core.Validator.OnChain
@@ -43,15 +46,23 @@ library
     , serialise
 
 test-suite en-registration-unit-tests
-  hs-source-dirs:     tests/unit
-  type:               exitcode-stdio-1.0
-  main-is:            Main.hs
+  hs-source-dirs:   tests/unit
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  main-is:          Main.hs
   other-modules:
     Adapter.CardanoCryptoClass.Crypto
+    Adapter.Cooked
+    Adapter.Plutus.Gen
     Specs.Aya.Registration.Core.Model
+    Specs.Aya.Registration.Core.Property.Datum.Violations
+    Specs.Aya.Registration.Core.Property.NFT.Ownership.Violations
+    Specs.Aya.Registration.Core.Property.NFT.Transitivity.Register.Violations
+    Specs.Aya.Registration.Core.Property.NFT.Transitivity.Update.Violations
     Specs.Aya.Registration.Core.Register.Fixture
+    Specs.Aya.Registration.Core.Register.NominalCase
     Specs.Aya.Registration.Core.Register.TxBuilding
-    Specs.Aya.Registration.Core.Specifications
+    Specs.Aya.Registration.Core.Update.NominalCase
     Specs.Aya.Registration.Core.Update.TxBuilding
 
   build-depends:
@@ -77,5 +88,4 @@ test-suite en-registration-unit-tests
     , tasty-quickcheck
     , text
 
-  build-tool-depends: hspec-discover:hspec-discover
-  ghc-options:        -threaded
+  ghc-options:      -Wall -threaded
