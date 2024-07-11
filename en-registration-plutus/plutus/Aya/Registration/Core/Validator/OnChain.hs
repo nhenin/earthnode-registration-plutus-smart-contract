@@ -35,6 +35,7 @@ module Aya.Registration.Core.Validator.OnChain (
   mkHashedRegistrationMessage,
   getRegistrationDatumAndENNFTTokenNameOutput,
   getENOPNFTTokenName,
+  getENNFTTokenName,
 ) where
 
 import GHC.Generics (Generic)
@@ -59,7 +60,8 @@ import Aya.Registration.Core.Property.Datum.Register (
   v_3_5_Registration_Validator_Has_Only_Hashed_Datum,
   v_3_6_More_Than_1_Registration_Validator_Output,
  )
-import Aya.Registration.Core.Property.NFT.Transitivity.Register (mkENOP_NFT, mkEN_NFT)
+import Aya.Registration.Core.Property.NFT.Transitivity.Update
+import Aya.Registration.Core.Property.Violation
 import Plutus.Script.Utils.V3.Contexts (valueSpent)
 
 newtype RegistrationValidatorSettings = RegistrationValidatorSettings
@@ -145,11 +147,16 @@ mkUntypedValidatorFunction s d r c =
 {-# INLINEABLE canUpdateRegistration #-}
 canUpdateRegistration :: RegistrationValidatorSettings -> ScriptContext -> Bool
 canUpdateRegistration RegistrationValidatorSettings{..} ctx =
-  let (datumInput, ennftTokenNameInput) = getRegistrationDatumAndENNFTTokenNameInput ennftCurrencySymbol ctx
-      (datumOutput, ennftTokenNameOutput) = getRegistrationDatumAndENNFTTokenNameOutput (ownHash ctx) ennftCurrencySymbol (scriptContextTxInfo ctx)
-      enopNFTNameOutput = tokenNameGivenToUniqueAndOnlySigner mkENOP_NFT (enopNFTCurrencySymbol datumInput) (scriptContextTxInfo ctx)
-      enopNFTNameInput = tokenNameSpent mkENOP_NFT (enopNFTCurrencySymbol datumInput) (scriptContextTxInfo ctx)
-   in checkRegistrationSignature datumInput
+  let getENNFTTokenNameForUpdate = getENNFTTokenName mk_u_EN_NFT_msgs ennftCurrencySymbol
+      (datumInput, ennftTokenNameInput) = getRegistrationDatumAndENNFTTokenNameInput getENNFTTokenNameForUpdate ctx
+      (datumOutput, ennftTokenNameOutput) = getRegistrationDatumAndENNFTTokenNameOutput (ownHash ctx) getENNFTTokenNameForUpdate (scriptContextTxInfo ctx)
+      enopNFTNameOutput = tokenNameGivenToUniqueAndOnlySigner mk_u_ENOP_NFT_msgs (enopNFTCurrencySymbol datumInput) (scriptContextTxInfo ctx)
+      enopNFTNameInput = tokenNameSpent mk_u_ENOP_NFT_msgs (enopNFTCurrencySymbol datumInput) (scriptContextTxInfo ctx)
+   in shouldNotMintOrBurn (scriptContextTxInfo ctx)
+        && propertyViolationIfFalse
+          v_u_1_1_0_ENOP_NFT_TokenName_Not_Equal_To_ENNFT_TokenName
+          (enopNFTNameOutput == ennftTokenNameOutput)
+        && checkRegistrationSignature datumInput
         && propertyViolationIfFalse "Datum to spent is invalid" (checkRegistrationSignature datumOutput)
         && propertyViolationIfFalse
           "Changing the ennft token name in the datum is not allowed"
@@ -160,12 +167,17 @@ canUpdateRegistration RegistrationValidatorSettings{..} ctx =
         && ennftTokenName datumInput
         == ennftTokenName datumOutput
         && enopNFTNameOutput
-        == ennftTokenNameOutput
-        && enopNFTNameOutput
         == ennftTokenName datumOutput
         && enopNFTCurrencySymbol datumInput
         == enopNFTCurrencySymbol datumOutput
 
+{-# INLINEABLE shouldNotMintOrBurn #-}
+shouldNotMintOrBurn :: TxInfo -> Bool
+shouldNotMintOrBurn txInfo =
+  propertyViolationIfFalse v_u_1_0_2_No_Minting_Allowed (not . hasAnyPositiveQuantities . txInfoMint $ txInfo)
+    && propertyViolationIfFalse v_u_1_0_3_No_Burning_Allowed (not . hasAnyNegativeQuantity . txInfoMint $ txInfo)
+
+{-# INLINEABLE checkRegistrationSignature #-}
 -- {-# INLINABLE checkDatumSig #-}
 -- Check the signature of the registration datum
 checkRegistrationSignature :: RegistrationDatum -> Bool
@@ -185,21 +197,22 @@ mkHashedRegistrationMessage ennftTokenName cardanoRewardPubKey commission enopNF
     $ unCurrencySymbol enopNFTCurrencySymbol
 
 {-# INLINEABLE getRegistrationDatumAndENNFTTokenNameOutput #-}
-getRegistrationDatumAndENNFTTokenNameOutput :: ScriptHash -> CurrencySymbol -> TxInfo -> (RegistrationDatum, TokenName)
-getRegistrationDatumAndENNFTTokenNameOutput registrationValidatorHash ennftCurrencySymbol =
+getRegistrationDatumAndENNFTTokenNameOutput
+  :: ScriptHash -> (Value -> TokenName) -> TxInfo -> (RegistrationDatum, TokenName)
+getRegistrationDatumAndENNFTTokenNameOutput registrationValidatorHash getENNFTTokenName' =
   \case
     [] -> propertyViolation v_3_3_Registration_Validator_Output_NotFound
-    [(OutputDatum (Datum scriptDatum), scriptValue)] -> (deserializeDatum scriptDatum, getENNFTTokenName ennftCurrencySymbol scriptValue)
+    [(OutputDatum (Datum scriptDatum), scriptValue)] -> (deserializeDatum scriptDatum, getENNFTTokenName' scriptValue)
     [(NoOutputDatum, _)] -> propertyViolation v_3_3_Registration_Validator_Output_NotFound
     [(OutputDatumHash _, _)] -> propertyViolation v_3_5_Registration_Validator_Has_Only_Hashed_Datum
     _ -> propertyViolation v_3_6_More_Than_1_Registration_Validator_Output
     . scriptOutputsAt registrationValidatorHash
 
 {-# INLINEABLE getRegistrationDatumAndENNFTTokenNameInput #-}
-getRegistrationDatumAndENNFTTokenNameInput :: CurrencySymbol -> ScriptContext -> (RegistrationDatum, TokenName)
-getRegistrationDatumAndENNFTTokenNameInput ennftCurrencySymbol =
+getRegistrationDatumAndENNFTTokenNameInput :: (Value -> TokenName) -> ScriptContext -> (RegistrationDatum, TokenName)
+getRegistrationDatumAndENNFTTokenNameInput getENNFTTokenName' =
   \case
-    (OutputDatum (Datum scriptDatum), scriptValue) -> (deserializeDatum scriptDatum, getENNFTTokenName ennftCurrencySymbol scriptValue)
+    (OutputDatum (Datum scriptDatum), scriptValue) -> (deserializeDatum scriptDatum, getENNFTTokenName' scriptValue)
     (NoOutputDatum, _) -> propertyViolation v_3_4_Registration_Validator_Has_No_Datum
     (OutputDatumHash _, _) -> propertyViolation v_3_5_Registration_Validator_Has_Only_Hashed_Datum
     . ( \case
@@ -222,16 +235,16 @@ deserializeDatum =
     . fromBuiltinData
 
 {-# INLINEABLE getENOPNFTTokenName #-}
-getENOPNFTTokenName :: CurrencySymbol -> TxInfo -> TokenName
-getENOPNFTTokenName enopNFTCurrencySymbol =
+getENOPNFTTokenName :: NFTPropertyViolationMsg -> CurrencySymbol -> TxInfo -> TokenName
+getENOPNFTTokenName msgs enopNFTCurrencySymbol =
   getNFTTokenName
-    mkENOP_NFT
+    msgs
     enopNFTCurrencySymbol
     . txInfoMint
 
 {-# INLINEABLE getENNFTTokenName #-}
-getENNFTTokenName :: CurrencySymbol -> Value -> TokenName
-getENNFTTokenName = getNFTTokenName mkEN_NFT
+getENNFTTokenName :: NFTPropertyViolationMsg -> CurrencySymbol -> Value -> TokenName
+getENNFTTokenName = getNFTTokenName
 
 ---- Code to be refined below
 

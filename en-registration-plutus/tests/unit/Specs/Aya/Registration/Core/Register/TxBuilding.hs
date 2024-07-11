@@ -324,7 +324,7 @@ registerByGeneratingMoreThan1ENOPNFT
   => (MonadBlockChain m)
   => KeyPair a
   -> ENNFT
-  -> [TokenName]
+  -> NL.NonEmpty TokenName
   -> Commission
   -> Wallet
   -> m [ENOPNFT]
@@ -346,7 +346,7 @@ registerByGeneratingMoreThan1ENOPNFT keyPair ennft differentTokenNames givenComm
         { txSkelMints =
             txSkelMintsFromList $
               (associatedENOPNFTMonetaryPolicy settings,SomeMintsRedeemer Mint,,1)
-                <$> (tokenName ennft : differentTokenNames)
+                <$> (tokenName ennft : NL.toList differentTokenNames)
         , txSkelLabel = Set.empty
         , txSkelOpts = def{txOptEnsureMinAda = True}
         , txSkelValidityRange = Api.always
@@ -358,7 +358,7 @@ registerByGeneratingMoreThan1ENOPNFT keyPair ennft differentTokenNames givenComm
                 givenOperator
                 ( nfts
                     (associatedENOPNFTCurrencySymbol settings)
-                    (tokenName ennft : differentTokenNames)
+                    (tokenName ennft : NL.toList differentTokenNames)
                 )
             , paysScriptInlineDatum
                 (typedRegistrationValidator settings)
@@ -376,7 +376,7 @@ registerByGeneratingMoreThan1ENOPNFT keyPair ennft differentTokenNames givenComm
         }
   return $
     NFT (associatedENOPNFTCurrencySymbol settings)
-      <$> (tokenName ennft : differentTokenNames)
+      <$> (tokenName ennft : NL.toList differentTokenNames)
 
 registerAndMintToAnotherOperator
   :: (ContextDSIGN a ~ (), DSIGNAlgorithm a, Signable a ByteString)

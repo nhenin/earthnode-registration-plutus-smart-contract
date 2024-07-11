@@ -12,24 +12,14 @@ import Adapter.CardanoCryptoClass.Crypto (ContextDSIGN, DSIGNAlgorithm (Signable
 import Data.ByteString (ByteString)
 
 import Adapter.Cooked
-import Aya.Registration.Core.Property.NFT.Transitivity.Register (
-  v_1_0_1_ENNOP_Minted_Quantity_Above_One,
-  v_1_0_2_No_ENNFT_On_Validator_Output,
-  v_1_0_3_ENNFT_Quantity_Above_One,
-  v_1_1_0_ENOP_NFT_TokenName_Not_Equal_To_ENNFT_TokenName,
-  v_1_1_1_ENOP_NFT_Cardinality_Above_1,
-  v_1_1_2_ENNFT_Cardinality_Above_1,
- )
+import Aya.Registration.Core.Property.NFT.Transitivity.Update
+import qualified Data.List.NonEmpty as NL
 import Specs.Aya.Registration.Core.Model
 import Specs.Aya.Registration.Core.Register.Fixture
 import Specs.Aya.Registration.Core.Register.TxBuilding (
-  registerByGeneratingMoreThan1ENNFT,
-  registerByGeneratingMoreThan1ENOPNFT,
-  registerMintingAnENOPWithQuantityAbove1,
-  registerWithDifferentENandENOPNFTTokenNames,
-  registerWithanENNFTWithAQuantityAbove1,
-  registerWithoutAnENNFT,
+  register,
  )
+import Specs.Aya.Registration.Core.Update.TxBuilding
 import Test.Tasty.QuickCheck (
   forAll,
   testProperty,
@@ -41,80 +31,104 @@ specs keys =
     "Update"
     [ testGroup
         "Property 1.0 : Tokens Quantities are verified"
-        [ testProperty
-            "1.0.0 violation - No ENNOP Minted (can't be enforced)"
-            True
-        , testProperty "1.0.1 violation - ENNOP Minted Quantity > 1" $
-            forAll (genFixtureFailureCaseDifferentTokenNames keys) $
-              \FixtureFailureCaseDifferentTokenNames{..} ->
-                shouldViolateAProperty
-                  v_1_0_1_ENNOP_Minted_Quantity_Above_One
-                  genesis
-                  $ registerMintingAnENOPWithQuantityAbove1
-                    substrateKeyPair
-                    ennft
-                    commission
-                    operator
-        , testProperty "1.0.2 violation - No ENNFT on Registration validator output" $
+        [ testProperty "u.1.0.0 violation - No ENNOP as Input" $
             forAll (genFixtureNominalCase keys) $
               \FixtureNominalCase{..} ->
                 shouldViolateAProperty
-                  v_1_0_2_No_ENNFT_On_Validator_Output
+                  v_u_1_0_0_No_ENNOP_As_Input
+                  (registrationCookedConfig . currencySymbol $ ennft)
                   genesis
-                  $ registerWithoutAnENNFT
-                    substrateKeyPair
-                    ennft
-                    commission
-                    operator
-        , testProperty "1.0.3 violation - ENNFT Quantity > 1" $
-            forAll (genFixtureENNFTWithWrongQuantityAbove1 keys) $
-              \FixtureENNFTWithWrongQuantityAbove1{..} ->
+                  $ do
+                    registrationReference <- register substrateKeyPair ennft commission operator
+                    updateWithoutENOPNFTASInput substrateKeyPair registrationReference commission operator anotherOperator
+        , testProperty "u.1.0.1 violation - No ENNFT on Registration validator output" $
+            forAll (genFixtureNominalCase keys) $
+              \FixtureNominalCase{..} ->
                 shouldViolateAProperty
-                  v_1_0_3_ENNFT_Quantity_Above_One
+                  v_u_1_0_1_No_ENNFT_On_Validator_Output
+                  (registrationCookedConfig . currencySymbol $ ennft)
                   genesis
-                  $ registerWithanENNFTWithAQuantityAbove1
-                    substrateKeyPair
-                    ennft
-                    wrongENNFTQuantity
-                    commission
-                    operator
+                  $ do
+                    registrationReference <- register substrateKeyPair ennft commission operator
+                    updateWithoutENNFTOnRegistrationValidatorOutput
+                      substrateKeyPair
+                      registrationReference
+                      commission
+                      operator
+                      anotherOperator
+        , testProperty "u.1.0.2 violation - No Minting Allowed" $
+            forAll (genFixtureNominalCase keys) $
+              \FixtureNominalCase{..} ->
+                shouldViolateAProperty
+                  v_u_1_0_2_No_Minting_Allowed
+                  (registrationCookedConfig . currencySymbol $ ennft)
+                  genesis
+                  $ do
+                    registrationReference <- register substrateKeyPair ennft commission operator
+                    updateAndMintSomething substrateKeyPair registrationReference commission operator anotherOperator
+        , testProperty "u.1.0.3 violation - No Burning Allowed" $
+            forAll (genFixtureNominalCase keys) $
+              \FixtureNominalCase{..} ->
+                shouldViolateAProperty
+                  v_u_1_0_3_No_Burning_Allowed
+                  (registrationCookedConfig . currencySymbol $ ennft)
+                  genesis
+                  $ do
+                    registrationReference <- register substrateKeyPair ennft commission operator
+                    updateAndBurnSomething substrateKeyPair registrationReference commission operator anotherOperator
         ]
     , testGroup
         "Property 1.1 : NFTs Token Names & Cardinality equality : There is 1-1 relationship between the ENNFT and the ENOPNFT"
-        [ testProperty "1.1.0 violation - ENOPNFT TokenName =/ ENNFT TokenName" $
-            forAll (genFixtureFailureCaseDifferentTokenNames keys) $
-              \FixtureFailureCaseDifferentTokenNames{..} ->
-                shouldViolateAProperty
-                  v_1_1_0_ENOP_NFT_TokenName_Not_Equal_To_ENNFT_TokenName
-                  genesis
-                  $ registerWithDifferentENandENOPNFTTokenNames
-                    substrateKeyPair
-                    ennft
-                    (head enopNFTTokenNames)
-                    commission
-                    operator
-        , testProperty "1.1.1 violation - |ENOP NFT| > 1 (Cardinality Violation)" $
-            forAll (genFixtureFailureCaseDifferentTokenNames keys) $
-              \FixtureFailureCaseDifferentTokenNames{..} ->
-                shouldViolateAProperty
-                  v_1_1_1_ENOP_NFT_Cardinality_Above_1
-                  genesis
-                  $ registerByGeneratingMoreThan1ENOPNFT
-                    substrateKeyPair
-                    ennft
-                    enopNFTTokenNames
-                    commission
-                    operator
-        , testProperty "1.1.2 violation - |EN NFT|   > 1 (Cardinality Violation)" $
+        [ testProperty "u.1.1.0 violation - ENOPNFT TokenName =/ ENNFT TokenName" $
             forAll (genFixtureMultipleENNFTs keys) $
               \FixtureMultipleENNFTs{..} ->
                 shouldViolateAProperty
-                  v_1_1_2_ENNFT_Cardinality_Above_1
+                  v_u_1_1_0_ENOP_NFT_TokenName_Not_Equal_To_ENNFT_TokenName
+                  (registrationCookedConfig ennftCurrencySymbol)
                   genesis
-                  $ registerByGeneratingMoreThan1ENNFT
-                    substrateKeyPair
-                    (ennftCurrencySymbol, firstEnnftTn, ennftsTokenNames)
-                    commission
-                    operator
+                  $ do
+                    registrationReference <- register substrateKeyPair (NFT ennftCurrencySymbol firstEnnftTn) commission operator
+                    (_, enopNFT2) <- register substrateKeyPair (NFT ennftCurrencySymbol (NL.head ennftsTokenNames)) commission operator
+                    updateWithDifferentENandENOPNFTTokenNames
+                      substrateKeyPair
+                      registrationReference
+                      enopNFT2
+                      commission
+                      operator
+                      anotherOperator
+        , testProperty "u.1.1.1 violation - |ENOP NFT| > 1 (Cardinality Violation)" $
+            forAll (genFixtureMultipleENNFTs keys) $
+              \FixtureMultipleENNFTs{..} ->
+                shouldViolateAProperty
+                  v_u_1_1_1_ENOP_NFT_Cardinality_Above_1
+                  (registrationCookedConfig ennftCurrencySymbol)
+                  genesis
+                  $ do
+                    registrationReference1 <- register substrateKeyPair (NFT ennftCurrencySymbol firstEnnftTn) commission operator
+                    registrationReference2 <-
+                      register substrateKeyPair (NFT ennftCurrencySymbol (NL.head ennftsTokenNames)) commission operator
+                    updateWithMoreThanOneENOPNFT
+                      substrateKeyPair
+                      registrationReference1
+                      registrationReference2
+                      commission
+                      operator
+                      anotherOperator
+        , testProperty "u.1.1.2 violation - |EN NFT|   > 1 (Cardinality Violation)" $
+            forAll (genFixtureMultipleENNFTs keys) $
+              \FixtureMultipleENNFTs{..} ->
+                shouldViolateAProperty
+                  v_u_1_1_2_ENNFT_Cardinality_Above_1
+                  (registrationCookedConfig ennftCurrencySymbol)
+                  genesis
+                  $ do
+                    registrationReference1 <- register substrateKeyPair (NFT ennftCurrencySymbol firstEnnftTn) commission operator
+                    updateWithMoreThanOneENNFT
+                      substrateKeyPair
+                      registrationReference1
+                      (NFT ennftCurrencySymbol (NL.head ennftsTokenNames))
+                      commission
+                      operator
+                      anotherOperator
         ]
     ]

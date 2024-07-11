@@ -36,6 +36,7 @@ specs keys =
               \FixtureNominalCase{..} ->
                 shouldViolateAProperty
                   v_2_0_0_ENOP_NFT_Not_Output_To_Operator
+                  (registrationCookedConfig . currencySymbol $ ennft)
                   genesis
                   $ registerAndMintToAnotherOperator substrateKeyPair ennft commission operator anotherOperator
         ]
@@ -49,6 +50,7 @@ specs keys =
               \FixtureNominalCase{..} ->
                 shouldViolateAProperty
                   v_2_1_0_More_Than_One_Signer
+                  (registrationCookedConfig . currencySymbol $ ennft)
                   genesis
                   $ registerWith2WalletsSigning substrateKeyPair ennft commission operator anotherOperator
         ]

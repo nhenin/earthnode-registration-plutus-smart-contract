@@ -31,11 +31,14 @@ module Adapter.Plutus.OnChain (
   getNFTTokenName,
   tokenNameGivenToUniqueAndOnlySigner,
   tokenNameSpent,
+  hasAnyPositiveQuantities,
+  hasAnyNegativeQuantity,
+  isZero,
 ) where
 
-import PlutusTx.Prelude
+import PlutusTx.Prelude hiding (any)
 
-import Plutus.Script.Utils.Value
+import Plutus.Script.Utils.Value hiding (isZero)
 import PlutusLedgerApi.V3
 
 import Aya.Registration.Core.Property.Violation (
@@ -60,6 +63,27 @@ instance Eq Quantity where
 
 PlutusTx.unstableMakeIsData ''Quantity
 PlutusTx.makeLift ''Quantity
+
+-- | Check whether a 'Value' is zero.
+{-# INLINEABLE isZero #-}
+isZero :: Value -> Bool
+isZero (Value xs) = Map.all (Map.all (\i -> 0 == i)) xs
+
+-- | Determines whether any elements in the map satisfy the predicate.
+{-# INLINEABLE any #-}
+any :: (a -> Bool) -> Map k a -> Bool
+any f = go . Map.toList
+  where
+    go [] = False
+    go ((_, x) : xs) = f x || go xs
+
+{-# INLINEABLE hasAnyPositiveQuantities #-}
+hasAnyPositiveQuantities :: Value -> Bool
+hasAnyPositiveQuantities (Value xs) = any (any (\i -> 0 < i)) xs
+
+{-# INLINEABLE hasAnyNegativeQuantity #-}
+hasAnyNegativeQuantity :: Value -> Bool
+hasAnyNegativeQuantity (Value xs) = any (any (\i -> i < 0)) xs
 
 {-# INLINEABLE convertToQuantity #-}
 convertToQuantity :: Integer -> Quantity
@@ -166,11 +190,11 @@ tokenNameSpent nftPropertyViolationMsgs enopNFTCurrencySymbol =
 -- | Get the token name of the NFT given to the unique and only signer
 {-# INLINEABLE getNFTTokenName #-}
 getNFTTokenName :: NFTPropertyViolationMsg -> CurrencySymbol -> Value -> TokenName
-getNFTTokenName nftPropertyViolationMsg@NFTPropertyViolationMsg{..} enopNFTCurrencySymbol =
+getNFTTokenName nftPropertyViolationMsg@NFTPropertyViolationMsg{..} givenCurrencySymbol =
   \case
     (tn, One) -> tn
     (_, MoreThanOne) -> propertyViolation whenQuantityMoreThanOne
-    . getUniqueTokenNameAndQuantity nftPropertyViolationMsg enopNFTCurrencySymbol
+    . getUniqueTokenNameAndQuantity nftPropertyViolationMsg givenCurrencySymbol
 
 {-# INLINEABLE getUniqueTokenNameAndQuantity #-}
 getUniqueTokenNameAndQuantity :: NFTPropertyViolationMsg -> CurrencySymbol -> Value -> (TokenName, Quantity)

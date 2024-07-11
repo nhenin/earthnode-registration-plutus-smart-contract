@@ -44,14 +44,11 @@ import Adapter.Plutus.OnChain (
   tokenNameGivenToUniqueAndOnlySigner,
  )
 import Aya.Registration.Core.Property.Datum.Register (v_3_2_Registration_Validator_Datim_Not_Authentic)
-import Aya.Registration.Core.Property.NFT.Transitivity.Register (
-  mkENOP_NFT,
-  v_1_1_0_ENOP_NFT_TokenName_Not_Equal_To_ENNFT_TokenName,
-  v_1_1_1_ENOP_NFT_Cardinality_Above_1,
- )
+import Aya.Registration.Core.Property.NFT.Transitivity.Register
 import Aya.Registration.Core.Validator.OnChain (
   RegistrationDatum,
   checkRegistrationSignature,
+  getENNFTTokenName,
   getENOPNFTTokenName,
   getRegistrationDatumAndENNFTTokenNameOutput,
  )
@@ -117,7 +114,10 @@ mkUntypedMintingPolicyFunction settings r c =
 canMintENOPNFT :: MonetaryPolicySettings -> CurrencySymbol -> TxInfo -> Bool
 canMintENOPNFT MonetaryPolicySettings{..} enopNFTCurrencySymbol txInfo =
   canMintENOPNFT' enopNFTCurrencySymbol txInfo
-    $ getRegistrationDatumAndENNFTTokenNameOutput registrationValidatorHash ennftCurrencySymbol txInfo
+    $ getRegistrationDatumAndENNFTTokenNameOutput
+      registrationValidatorHash
+      (getENNFTTokenName mk_r_EN_NFT_msgs ennftCurrencySymbol)
+      txInfo
 
 {-# INLINEABLE canMintENOPNFT' #-}
 canMintENOPNFT' :: CurrencySymbol -> TxInfo -> (RegistrationDatum, TokenName) -> Bool
@@ -128,16 +128,16 @@ canMintENOPNFT' enopNFTCurrencySymbol txInfo (registrationDatum, ennftTokenName)
   where
     mustHaveSameENOPAndENTokenNames =
       propertyViolationIfFalse
-        v_1_1_0_ENOP_NFT_TokenName_Not_Equal_To_ENNFT_TokenName
-        (ennftTokenName == getENOPNFTTokenName enopNFTCurrencySymbol txInfo)
+        v_r_1_1_0_ENOP_NFT_TokenName_Not_Equal_To_ENNFT_TokenName
+        (ennftTokenName == getENOPNFTTokenName mk_r_ENOP_NFT_msgs enopNFTCurrencySymbol txInfo)
     mustHaveAnAuthenticRegistrationDatum =
       propertyViolationIfFalse
         v_3_2_Registration_Validator_Datim_Not_Authentic
         (checkRegistrationSignature registrationDatum)
     mustOutputENOPNFTToOperator =
       propertyViolationIfFalse
-        v_1_1_1_ENOP_NFT_Cardinality_Above_1
-        (ennftTokenName == tokenNameGivenToUniqueAndOnlySigner mkENOP_NFT enopNFTCurrencySymbol txInfo)
+        v_r_1_1_1_ENOP_NFT_Cardinality_Above_1
+        (ennftTokenName == tokenNameGivenToUniqueAndOnlySigner mk_r_ENOP_NFT_msgs enopNFTCurrencySymbol txInfo)
 
 ---- Below needs to be refined
 

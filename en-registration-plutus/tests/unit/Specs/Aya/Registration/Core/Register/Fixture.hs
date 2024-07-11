@@ -1,5 +1,6 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -8,10 +9,8 @@
 module Specs.Aya.Registration.Core.Register.Fixture (
   FixtureNominalCase (..),
   genFixtureNominalCase,
-  FixtureENNFTWithWrongQuantityAbove1 (..),
+  FixtureENNFTWithInvalidQuantityAbove1 (..),
   genFixtureENNFTWithWrongQuantityAbove1,
-  FixtureFailureCaseDifferentTokenNames (..),
-  genFixtureFailureCaseDifferentTokenNames,
   FixtureMultipleENNFTs (..),
   genFixtureMultipleENNFTs,
   FixtureWithInvalidSignature (..),
@@ -34,7 +33,7 @@ import Data.Coerce
 import Data.List.NonEmpty qualified as NL
 
 import Adapter.Cooked ()
-import Adapter.Plutus.Gen (anyAtleast2ENNFTWithSameCurrency, anyENNFT, anyENNFTTokenNames, genByteStringOf)
+import Adapter.Plutus.Gen (anyAtleast2ENNFTWithSameCurrency, anyENNFT, genByteStringOf)
 import Aya.Registration.Core.Validator.Builder
 import Aya.Registration.Core.Validator.OnChain
 import PlutusLedgerApi.V3 (
@@ -43,7 +42,12 @@ import PlutusLedgerApi.V3 (
   fromBuiltin,
   singleton,
  )
-import Specs.Aya.Registration.Core.Model
+import Specs.Aya.Registration.Core.Model (
+  ENNFT,
+  NFT (..),
+  nftToValue,
+  operator,
+ )
 
 data FixtureNominalCase a = FixtureNominalCase
   { genesis :: InitialDistribution
@@ -63,7 +67,7 @@ data FixtureWithInvalidSignature a = FixtureWithInvalidSignature
   }
   deriving (Show)
 
-data FixtureENNFTWithWrongQuantityAbove1 a = FixtureENNFTWithWrongQuantityAbove1
+data FixtureENNFTWithInvalidQuantityAbove1 a = FixtureENNFTWithInvalidQuantityAbove1
   { genesis :: InitialDistribution
   , substrateKeyPair :: KeyPair a
   , commission :: Integer
@@ -80,16 +84,19 @@ data FixtureMultipleENNFTs a = FixtureMultipleENNFTs
   , firstEnnftTn :: TokenName
   , ennftsTokenNames :: NL.NonEmpty TokenName
   }
-  deriving (Show)
 
-data FixtureFailureCaseDifferentTokenNames a = FixtureFailureCaseDifferentTokenNames
-  { genesis :: InitialDistribution
-  , substrateKeyPair :: KeyPair a
-  , commission :: Integer
-  , ennft :: ENNFT
-  , enopNFTTokenNames :: [TokenName]
-  }
-  deriving (Show)
+instance Show (FixtureMultipleENNFTs a) where
+  show :: FixtureMultipleENNFTs a -> String
+  show FixtureMultipleENNFTs{..} =
+    "FixtureMultipleENNFTs { commission = "
+      <> show commission
+      <> ", ennftCurrencySymbol = "
+      <> show ennftCurrencySymbol
+      <> ", firstEnnftTn = "
+      <> show firstEnnftTn
+      <> ", ennftsTokenNames = "
+      <> show ennftsTokenNames
+      <> " }"
 
 genFixtureNominalCase :: [KeyPair a] -> Gen (FixtureNominalCase a)
 genFixtureNominalCase keypairs = do
@@ -113,42 +120,14 @@ genFixtureNominalCase keypairs = do
     <*> chooseInteger (0, 100)
     <*> pure anEnnft
 
-genFixtureFailureCaseDifferentTokenNames :: [KeyPair a] -> Gen (FixtureFailureCaseDifferentTokenNames a)
-genFixtureFailureCaseDifferentTokenNames keypairs = do
-  aSubstrateKeyPair <- elements keypairs
-  anEnnft <- anyENNFT
-  anEnopNFTTokenNames <- anyENNFTTokenNames `suchThat` (notElem . tokenName $ anEnnft)
-  aCommission <- chooseInteger (0, 100)
-  pure
-    FixtureFailureCaseDifferentTokenNames
-      { genesis =
-          distributionFromList
-            [
-              ( operator
-              ,
-                [ ada 100
-                , ada 5
-                , ada 5
-                , ada 5
-                , ada 5
-                , ada 2 <> nftToValue anEnnft
-                ]
-              )
-            ]
-      , substrateKeyPair = aSubstrateKeyPair
-      , commission = aCommission
-      , ennft = anEnnft
-      , enopNFTTokenNames = anEnopNFTTokenNames
-      }
-
-genFixtureENNFTWithWrongQuantityAbove1 :: [KeyPair a] -> Gen (FixtureENNFTWithWrongQuantityAbove1 a)
+genFixtureENNFTWithWrongQuantityAbove1 :: [KeyPair a] -> Gen (FixtureENNFTWithInvalidQuantityAbove1 a)
 genFixtureENNFTWithWrongQuantityAbove1 keypairs = do
   aSubstrateKeyPair <- elements keypairs
   anEnnft <- anyENNFT
   aWrongENNFTQuantity <- chooseInteger (2, 100)
   aCommission <- chooseInteger (0, 100)
   pure
-    FixtureENNFTWithWrongQuantityAbove1
+    FixtureENNFTWithInvalidQuantityAbove1
       { genesis =
           distributionFromList
             [

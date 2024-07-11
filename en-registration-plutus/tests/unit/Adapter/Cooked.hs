@@ -12,12 +12,13 @@ import Test.Tasty.QuickCheck (Property)
 shouldViolateAProperty
   :: (Show a)
   => BuiltinString
+  -> PrettyCookedOpts
   -> InitialDistribution
   -> StagedMockChain a
   -> Property
-shouldViolateAProperty e =
+shouldViolateAProperty e opt =
   testFailsFrom @Property
-    def
+    opt
     ( isCekEvaluationFailureWithMsg
         def
         (\a -> show a == show e)

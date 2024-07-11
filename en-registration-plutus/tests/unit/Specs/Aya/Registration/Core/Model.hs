@@ -17,6 +17,7 @@ module Specs.Aya.Registration.Core.Model (
   nftToValue,
   operator,
   anotherOperator,
+  registrationCookedConfig,
 ) where
 
 import Cooked
@@ -26,10 +27,17 @@ import PlutusTx.AssocMap qualified as PMap
 import Aya.Registration.Core.ENOPNFT.MonetaryPolicy.OnChain (Action (..))
 
 import Adapter.CardanoCryptoClass.Crypto
+import Aya.Registration.Core.Validator.Builder (
+  associatedENOPNFTMonetaryPolicy,
+  typedRegistrationValidator,
+ )
 import Aya.Registration.Core.Validator.OnChain (
   RegistrationAction (..),
   RegistrationDatum (..),
+  RegistrationValidatorSettings (..),
  )
+import Cooked qualified as C
+import Data.Default
 import Data.Text qualified as Text
 import PlutusLedgerApi.V3 (CurrencySymbol, TokenName, Value, fromBuiltin)
 import PlutusLedgerApi.V3 qualified as V3
@@ -53,6 +61,27 @@ operator = wallet 1
 
 anotherOperator :: Wallet
 anotherOperator = wallet 2
+
+registrationCookedConfig :: CurrencySymbol -> C.PrettyCookedOpts
+registrationCookedConfig ennftCurrencySymbol =
+  let settings = RegistrationValidatorSettings ennftCurrencySymbol
+   in def
+        { C.pcOptHashes =
+            def
+              { C.pcOptHashNames =
+                  C.hashNamesFromList
+                    [ (operator, "Operator")
+                    , (anotherOperator, "Another Operator")
+                    ]
+                    <> C.hashNamesFromList
+                      [ (associatedENOPNFTMonetaryPolicy settings, "ENOP NFT")
+                      ]
+                    <> C.hashNamesFromList
+                      [ (typedRegistrationValidator settings, "Registration Validator")
+                      ]
+                    <> C.defaultHashNames -- IMPORTANT: must be the last element
+              }
+        }
 
 instance PrettyCooked Action where
   prettyCookedOpt _ Mint = "Mint ENNOPNFT"

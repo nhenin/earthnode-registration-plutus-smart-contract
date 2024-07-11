@@ -74,34 +74,35 @@ The following information is required as input for the smart contract transactio
 
 - **Register**
     - `Property 1.0` : Tokens Quantities are verified
-      - `1.0.0 violation` - No ENNOP Minted (can't be enforced) 
-      - `1.0.1 violation` - ENNOP Minted Quantity > 1
-      - `1.0.2 violation` - No ENNFT on Registration validator output                              
-      - `1.0.3 violation` - ENNFT Quantity > 1                         
+      - `r.1.0.0 violation` - No ENNOP Minted (can't be enforced) 
+      - `r.1.0.1 violation` - ENNOP Minted Quantity > 1
+      - `r.1.0.2 violation` - No ENNFT on Registration validator output                              
+      - `r.1.0.3 violation` - ENNFT Quantity > 1                         
     - `Property 1.1` : NFTs Token Names & Cardinality equality : There is 1-1 relationship between the ENNFT and the ENOPNFT
-      - `1.1.0 violation` - ENOPNFT TokenName =/ ENNFT TokenName                   
-      - `1.1.1 violation` - |ENOP NFT| > 1 (Cardinality Violation)                
-      - `1.1.2 violation` - |EN NFT|   > 1 (Cardinality Violation)
+      - `r.1.1.0 violation` - ENOPNFT TokenName =/ ENNFT TokenName                   
+      - `r.1.1.1 violation` - |ENOP NFT| > 1 (Cardinality Violation)                
+      - `r.1.1.2 violation` - |EN NFT|   > 1 (Cardinality Violation)
 - **Update** 
   - `Property 1.0` : Tokens Quantities are verified
-    - `1.0.0 violation` - No ENNOP as Input
-    - `1.0.1 violation` - No ENNFT on Registration validator Spent   
-    - `1.0.2 violation` - No Minting/Burning Allowed                             
-    - `1.0.3 violation` - ENNFT Quantity > 1                            
+    - `u.1.0.0 violation` - No ENNOP as Input
+    - `u.1.0.1 violation` - No ENNFT on Registration validator output    
+    - `u.1.0.2 violation` - No Minting Allowed  
+    - `u.1.0.3 violation` - No Burning Allowed                             
+    - `u.1.0.4 violation` - ENNFT Quantity > 1                            
   - `Property 1.1` : NFTs Token Names & Cardinality equality : There is 1-1 relationship between the ENNFT and the ENOPNFT
-    - `1.1.0 violation` - ENOPNFT TokenName =/ ENNFT TokenName:                   
-    - `1.1.1 violation` - |ENOP NFT| > 1 (Cardinality Violation)                 
-    - `1.1.2 violation` - |EN NFT|   > 1 (Cardinality Violation)
-- **UnRegister** 
+    - `u.1.1.0 violation` - ENOPNFT TokenName =/ ENNFT TokenName:                   
+    - `u.1.1.1 violation` - |ENOP NFT| > 1 (Cardinality Violation)                 
+    - `u.1.1.2 violation` - |EN NFT|   > 1 (Cardinality Violation)
+- **Deregister** 
   - `Property 1.0` : Tokens Quantities are verified
-    - `1.0.0 violation` - No ENNOP Burnt  
-    - `1.0.1 violation` - No ENNFT Release from Script                             
-    - `1.0.2 violation` - ENNFT Quantity > 1
-    - `1.0.3 violation` - No Minting Allowed                             
+    - `d.1.0.0 violation` - No ENNOP Burnt  
+    - `d.1.0.1 violation` - No ENNFT Release from Script                             
+    - `d.1.0.2 violation` - ENNFT Quantity > 1
+    - `d.1.0.3 violation` - No Minting Allowed                             
   - `Property 1.1` : NFTs Token Names & Cardinality equality : There is 1-1 relationship between the ENNFT and the ENOPNFT
-    - `1.1.0 violation` - ENOPNFT TokenName =/ ENNFT TokenName:                   
-    - `1.1.1 violation` - |ENOP NFT| > 1 (Cardinality Violation)               
-    - `1.1.2 violation` - |EN NFT|   > 1 (Cardinality Violation) 
+    - `d.1.1.0 violation` - ENOPNFT TokenName =/ ENNFT TokenName:                   
+    - `d.1.1.1 violation` - |ENOP NFT| > 1 (Cardinality Violation)               
+    - `d.1.1.2 violation` - |EN NFT|   > 1 (Cardinality Violation) 
                   
 ### **Property 2 - Preserving NFTs ownership** : ENOP and ENNFT can be swapped only between the operator and the registration smart contract
 

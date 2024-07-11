@@ -31,6 +31,7 @@ library
     Aya.Registration.Core.Property.Datum.Register
     Aya.Registration.Core.Property.NFT.Ownership.Register
     Aya.Registration.Core.Property.NFT.Transitivity.Register
+    Aya.Registration.Core.Property.NFT.Transitivity.Update
     Aya.Registration.Core.Property.Violation
     Aya.Registration.Core.Validator.Builder
     Aya.Registration.Core.Validator.OnChain
