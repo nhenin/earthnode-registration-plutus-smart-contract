@@ -88,21 +88,21 @@ The following information is required as input for the smart contract transactio
     - `u.1.0.1 violation` - No ENNFT on Registration validator output    
     - `u.1.0.2 violation` - No Minting Allowed  
     - `u.1.0.3 violation` - No Burning Allowed                             
-    - `u.1.0.4 violation` - ENNFT Quantity > 1                            
   - `Property 1.1` : NFTs Token Names & Cardinality equality : There is 1-1 relationship between the ENNFT and the ENOPNFT
     - `u.1.1.0 violation` - ENOPNFT TokenName =/ ENNFT TokenName:                   
     - `u.1.1.1 violation` - |ENOP NFT| > 1 (Cardinality Violation)                 
     - `u.1.1.2 violation` - |EN NFT|   > 1 (Cardinality Violation)
 - **Deregister** 
   - `Property 1.0` : Tokens Quantities are verified
-    - `d.1.0.0 violation` - No ENNOP Burnt  
-    - `d.1.0.1 violation` - No ENNFT Release from Script                             
-    - `d.1.0.2 violation` - ENNFT Quantity > 1
-    - `d.1.0.3 violation` - No Minting Allowed                             
+    - `d.1.0.0 violation` - No ENNOP NFT To Burn  
+    - `d.1.0.1 violation` - No Minting Allowed                             
+    - `d.1.0.2 violation` - ENOP NFT Quantity to Burn > 1  (enforced by Non Fungible Property of EN Tokens )    
+    - `d.1.0.3 violation` - No ENNFT Released To Operator                        
   - `Property 1.1` : NFTs Token Names & Cardinality equality : There is 1-1 relationship between the ENNFT and the ENOPNFT
     - `d.1.1.0 violation` - ENOPNFT TokenName =/ ENNFT TokenName:                   
     - `d.1.1.1 violation` - |ENOP NFT| > 1 (Cardinality Violation)               
-    - `d.1.1.2 violation` - |EN NFT|   > 1 (Cardinality Violation) 
+    - `d.1.1.2 violation` - |EN NFT|   > 1 (Cardinality Violation)
+    - `d.1.1.3 violation` - No Registration validator Output Allowed 
                   
 ### **Property 2 - Preserving NFTs ownership** : ENOP and ENNFT can be swapped only between the operator and the registration smart contract
 
@@ -123,7 +123,7 @@ The following information is required as input for the smart contract transactio
     - `2.1.0 violation` - No signer found (Enforced by Ledger Properties)        
     - `2.1.1 violation` - signer is not unique 
                   
-- **Unregister** 
+- **Deregister** 
   - `Property 2.0` : ENOP NFT should be spent from the operator and burnt
     - `2.0.0 violation` - No ENNOP as Input                    
     - `2.0.1 violation` - No ENNOP Burn (Already Validated by - `1.0.0 violation` )
@@ -170,7 +170,7 @@ The following information is required as input for the smart contract transactio
       - `3.5.1` - for Datum output  
   - `3.6 violation` - More than one Registration validator output is not allowed (Reducing complexity)
 
-- **Unregister**
+- **Deregister**
   - `3.0 violation` - Registration datum spent should be valid
       -  `3.0.1 violation` - `ennftTokenName` field should be equal to the spent ennft token Name
       -  `3.0.2 violation` - `enopNFTCurrencySymbol` field should be equal to the ENOP NFT currency Symbol minted

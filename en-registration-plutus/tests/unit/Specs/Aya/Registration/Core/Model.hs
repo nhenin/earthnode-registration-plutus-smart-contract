@@ -89,7 +89,7 @@ instance PrettyCooked Action where
 
 instance PrettyCooked RegistrationAction where
   prettyCookedOpt _ UpdateRegistrationDetails = "UpdateRegistrationDetails"
-  prettyCookedOpt _ Unregister = "Unregister"
+  prettyCookedOpt _ Deregister = "Deregister"
 
 instance PrettyCooked RegistrationDatum where
   prettyCookedOpt opts RegistrationDatum{..} =

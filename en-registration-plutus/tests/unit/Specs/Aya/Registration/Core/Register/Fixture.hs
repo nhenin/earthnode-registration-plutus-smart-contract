@@ -45,6 +45,7 @@ import PlutusLedgerApi.V3 (
 import Specs.Aya.Registration.Core.Model (
   ENNFT,
   NFT (..),
+  anotherOperator,
   nftToValue,
   operator,
  )
@@ -106,12 +107,20 @@ genFixtureNominalCase keypairs = do
         [
           ( operator
           ,
-            [ ada 100
-            , ada 5
+            [ ada 500
             , ada 5
             , ada 5
             , ada 5
             , ada 2 <> nftToValue anEnnft
+            ]
+          )
+        ,
+          ( anotherOperator
+          ,
+            [ ada 500
+            , ada 5
+            , ada 5
+            , ada 5
             ]
           )
         ]

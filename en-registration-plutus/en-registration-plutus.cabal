@@ -30,6 +30,7 @@ library
     Aya.Registration.Core.ENOPNFT.MonetaryPolicy.OnChain
     Aya.Registration.Core.Property.Datum.Register
     Aya.Registration.Core.Property.NFT.Ownership.Register
+    Aya.Registration.Core.Property.NFT.Transitivity.Deregister
     Aya.Registration.Core.Property.NFT.Transitivity.Register
     Aya.Registration.Core.Property.NFT.Transitivity.Update
     Aya.Registration.Core.Property.Violation
@@ -55,9 +56,12 @@ test-suite en-registration-unit-tests
     Adapter.CardanoCryptoClass.Crypto
     Adapter.Cooked
     Adapter.Plutus.Gen
+    Specs.Aya.Registration.Core.Deregister.NominalCase
+    Specs.Aya.Registration.Core.Deregister.TxBuilding
     Specs.Aya.Registration.Core.Model
     Specs.Aya.Registration.Core.Property.Datum.Violations
     Specs.Aya.Registration.Core.Property.NFT.Ownership.Violations
+    Specs.Aya.Registration.Core.Property.NFT.Transitivity.Deregister.Violations
     Specs.Aya.Registration.Core.Property.NFT.Transitivity.Register.Violations
     Specs.Aya.Registration.Core.Property.NFT.Transitivity.Update.Violations
     Specs.Aya.Registration.Core.Register.Fixture

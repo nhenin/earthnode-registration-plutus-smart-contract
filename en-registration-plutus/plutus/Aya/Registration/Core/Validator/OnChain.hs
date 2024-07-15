@@ -23,6 +23,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:conservative-optimisation #-}
 
 module Aya.Registration.Core.Validator.OnChain (
@@ -40,9 +41,6 @@ module Aya.Registration.Core.Validator.OnChain (
 
 import GHC.Generics (Generic)
 
-import Plutus.Script.Utils.Value (
-  valueOf,
- )
 import PlutusLedgerApi.V3
 import PlutusTx qualified
 import PlutusTx.Prelude as Plutus.Prelude
@@ -60,9 +58,10 @@ import Aya.Registration.Core.Property.Datum.Register (
   v_3_5_Registration_Validator_Has_Only_Hashed_Datum,
   v_3_6_More_Than_1_Registration_Validator_Output,
  )
+import Aya.Registration.Core.Property.NFT.Transitivity.Deregister
 import Aya.Registration.Core.Property.NFT.Transitivity.Update
 import Aya.Registration.Core.Property.Violation
-import Plutus.Script.Utils.V3.Contexts (valueSpent)
+import PlutusTx.AssocMap qualified as Map
 
 newtype RegistrationValidatorSettings = RegistrationValidatorSettings
   { ennftCurrencySymbol :: CurrencySymbol
@@ -113,25 +112,25 @@ PlutusTx.makeLift ''RegistrationDatum
 -- | The actions that can be performed by the operator
 -- | N.B : The action Register is enforced by the ENOPNFT NFT minting policy
 data RegistrationAction
-  = -- | Unregister the operator
-    Unregister
+  = -- | Deregister the operator
+    Deregister
   | -- | Update the registration information
     UpdateRegistrationDetails
   deriving (Prelude.Show, Generic)
 
 instance Eq RegistrationAction where
   {-# INLINEABLE (==) #-}
-  Unregister == Unregister = True
+  Deregister == Deregister = True
   UpdateRegistrationDetails == UpdateRegistrationDetails = True
   _ == _ = False
 
-PlutusTx.makeIsDataIndexed ''RegistrationAction [('UpdateRegistrationDetails, 0), ('Unregister, 1)]
+PlutusTx.makeIsDataIndexed ''RegistrationAction [('UpdateRegistrationDetails, 0), ('Deregister, 1)]
 PlutusTx.makeLift ''RegistrationAction
 
 {-# INLINEABLE mkValidatorFunction #-}
 mkValidatorFunction :: RegistrationValidatorSettings -> RegistrationDatum -> RegistrationAction -> ScriptContext -> Bool
 mkValidatorFunction registrationValidatorSettings _ UpdateRegistrationDetails ctx = canUpdateRegistration registrationValidatorSettings ctx
-mkValidatorFunction registrationValidatorSettings datum Unregister ctx = canUnregister registrationValidatorSettings datum ctx
+mkValidatorFunction registrationValidatorSettings datum Deregister ctx = canDeregister registrationValidatorSettings datum ctx
 
 {-# INLINEABLE mkUntypedValidatorFunction #-}
 mkUntypedValidatorFunction :: RegistrationValidatorSettings -> BuiltinData -> BuiltinData -> BuiltinData -> ()
@@ -246,29 +245,46 @@ getENOPNFTTokenName msgs enopNFTCurrencySymbol =
 getENNFTTokenName :: NFTPropertyViolationMsg -> CurrencySymbol -> Value -> TokenName
 getENNFTTokenName = getNFTTokenName
 
----- Code to be refined below
+{-# INLINEABLE canDeregister #-}
+canDeregister :: RegistrationValidatorSettings -> RegistrationDatum -> ScriptContext -> Bool
+canDeregister RegistrationValidatorSettings{..} RegistrationDatum{..} ctx =
+  ( \enopNFTToBurn ->
+      let getENNFTTokenNameForUpdate = getENNFTTokenName mk_d_EN_NFT_msgs ennftCurrencySymbol
+          ennftTokenNameInput = snd $ getRegistrationDatumAndENNFTTokenNameInput getENNFTTokenNameForUpdate ctx
+          nftsWithSameTokenNames =
+            propertyViolationIfFalse
+              v_d_1_1_0_ENOP_NFT_TokenName_Not_Equal_To_ENNFT_TokenName
+              (ennftTokenNameInput == enopNFTToBurn)
+          hasENNFTReleasedToOperator =
+            propertyViolationIfFalse
+              v_d_1_0_3_No_ENNFT_Released_To_Operator
+              (tokenNameGivenToUniqueAndOnlySigner mk_d_EN_NFT_msgs ennftCurrencySymbol (scriptContextTxInfo ctx) == ennftTokenName)
+       in nftsWithSameTokenNames
+            && hasENNFTReleasedToOperator
+  )
+    . getENOPNftToBurn ctx
+    $ enopNFTCurrencySymbol
 
-{-# INLINEABLE canUnregister #-}
-canUnregister :: RegistrationValidatorSettings -> RegistrationDatum -> ScriptContext -> Bool
-canUnregister RegistrationValidatorSettings{..} RegistrationDatum{..} ctx
-  -- No UTxO's to the script are allowed
-  | noScriptOutputs $ txInfoOutputs info
-  , -- the ENOPNFT must be burnt in this transaction
-    isEnOPNftBurnt
-  , -- The ENNFT is spent in this transaction
-    valueOf (valueSpent info) ennftCurrencySymbol ennftTokenName == 1 =
-      True
-  | otherwise = False
-  where
-    info = scriptContextTxInfo ctx
-    -- make sure the EnOpNFT is burnt
-    isEnOPNftBurnt :: Bool
-    isEnOPNftBurnt = valueOf (txInfoMint info) enopNFTCurrencySymbol ennftTokenName == -1
+{-# INLINEABLE getENOPNftToBurn #-}
+getENOPNftToBurn :: ScriptContext -> CurrencySymbol -> TokenName
+getENOPNftToBurn ctx =
+  ( \case
+      [] -> propertyViolation v_d_1_0_0_No_ENNOP_To_Burn
+      [(enopNFTToBurn, burnQuantity)] ->
+        if burnQuantity == -1
+          then enopNFTToBurn
+          else
+            if burnQuantity == 0
+              then propertyViolation v_d_1_0_0_No_ENNOP_To_Burn
+              else
+                if burnQuantity > 0
+                  then propertyViolation v_d_1_0_1_No_Minting_Allowed
+                  else propertyViolation v_d_1_0_2_More_Than_One_ENOP_To_Burn
+      _ -> propertyViolation v_d_1_1_1_ENOP_NFT_Cardinality_Above_1
+  )
+    . valueOf' (txInfoMint . scriptContextTxInfo $ ctx)
 
-    noScriptOutputs :: [TxOut] -> Bool
-    noScriptOutputs [] = True
-    noScriptOutputs (h : t) =
-      let checkInput :: TxOut -> Bool
-          checkInput TxOut{txOutAddress = Address (ScriptCredential _) _} = False
-          checkInput _ = True
-       in checkInput h && noScriptOutputs t
+{-# INLINEABLE valueOf' #-}
+valueOf' :: Value -> CurrencySymbol -> [(TokenName, Integer)]
+valueOf' (Value mp) cur =
+  maybe [] Map.toList (Map.lookup cur mp)
