@@ -12,6 +12,8 @@ module Specs.Aya.Registration.Core.Deregister.TxBuilding (
   deregisterWithENOPTokenNameDifferentThanENNFTokenName,
   deregisterWithMultipleENOPNFTs,
   deregisterWithENNFTCardinalityAbove1,
+  deregisterWihtoutRegistrationValidatorInput,
+  deregisterWith2WalletSigning,
 ) where
 
 import Cooked
@@ -74,6 +76,65 @@ deregister registratedItemId@(settings, enopNFT) operator = do
                 operator
                 (V3.singleton (ennftCurrencySymbol settings) (tokenName enopNFT) 1)
             ]
+        }
+  return registratedItemId
+
+deregisterWith2WalletSigning
+  :: (MonadBlockChain m)
+  => (RegistrationValidatorSettings, ENOPNFT)
+  -> Wallet
+  -> Wallet
+  -> m (RegistrationValidatorSettings, ENOPNFT)
+deregisterWith2WalletSigning registratedItemId@(settings, enopNFT) operator anotherOperator = do
+  registeredItemRef <-
+    ( fst
+        . fromMaybe (error "No ENNFT found on registration validator utxos.")
+        . headMay
+        <$>
+      )
+      . runUtxoSearch
+      . flip filterWithPred (containsENNFT registratedItemId . outputValue)
+      . utxosAtSearch
+      $ registrationValidatorAddress settings
+
+  _ <-
+    validateTxSkel $
+      txSkelTemplate
+        { txSkelMints =
+            txSkelMintsFromList [(associatedENOPNFTMonetaryPolicy settings, SomeMintsRedeemer Burn, tokenName enopNFT, -1)]
+        , txSkelLabel = Set.empty
+        , txSkelOpts = def{txOptEnsureMinAda = True}
+        , txSkelValidityRange = Api.always
+        , txSkelSigners = [operator, anotherOperator]
+        , txSkelIns = Map.singleton registeredItemRef (TxSkelRedeemerForScript Deregister)
+        , txSkelInsReference = Set.empty
+        , txSkelOuts =
+            [ paysPK
+                operator
+                (V3.singleton (ennftCurrencySymbol settings) (tokenName enopNFT) 1)
+            ]
+        }
+  return registratedItemId
+
+deregisterWihtoutRegistrationValidatorInput
+  :: (MonadBlockChain m)
+  => (RegistrationValidatorSettings, ENOPNFT)
+  -> Wallet
+  -> m (RegistrationValidatorSettings, ENOPNFT)
+deregisterWihtoutRegistrationValidatorInput registratedItemId@(settings, enopNFT) operator = do
+  _ <-
+    validateTxSkel $
+      txSkelTemplate
+        { txSkelMints =
+            txSkelMintsFromList [(associatedENOPNFTMonetaryPolicy settings, SomeMintsRedeemer Burn, tokenName enopNFT, -1)]
+        , txSkelLabel = Set.empty
+        , txSkelOpts = def{txOptEnsureMinAda = True}
+        , txSkelValidityRange = Api.always
+        , txSkelSigners = [operator]
+        , txSkelIns = Map.empty
+        , txSkelInsReference = Set.empty
+        , txSkelOuts =
+            []
         }
   return registratedItemId
 

@@ -19,7 +19,7 @@ module Aya.Registration.Core.Property.NFT.Transitivity.Update (
   mk_u_ENOP_NFT_msgs,
   mk_u_EN_NFT_msgs,
   -- `Property 1.0` : Tokens Quantities are verified
-  v_u_1_0_0_No_ENNOP_As_Input,
+  v_u_1_0_0_ENNOP_Not_Output_to_Operator,
   v_u_1_0_1_No_ENNFT_On_Validator_Output,
   v_u_1_0_2_No_Minting_Allowed,
   v_u_1_0_3_No_Burning_Allowed,
@@ -34,7 +34,7 @@ import Aya.Registration.Core.Property.Violation
 import PlutusTx.Prelude (BuiltinString)
 
 -- `Property 1.0` : Tokens Quantities are verified
-{-# INLINEABLE v_u_1_0_0_No_ENNOP_As_Input #-}
+{-# INLINEABLE v_u_1_0_0_ENNOP_Not_Output_to_Operator #-}
 {-# INLINEABLE v_u_1_0_1_No_ENNFT_On_Validator_Output #-}
 {-# INLINEABLE v_u_1_0_2_No_Minting_Allowed #-}
 {-# INLINEABLE v_u_1_0_3_No_Burning_Allowed #-}
@@ -45,7 +45,7 @@ import PlutusTx.Prelude (BuiltinString)
 {-# INLINEABLE v_u_1_1_1_ENOP_NFT_Cardinality_Above_1 #-}
 {-# INLINEABLE v_u_1_1_2_ENNFT_Cardinality_Above_1 #-}
 -- `Property 1.0` : Tokens Quantities are verified
-v_u_1_0_0_No_ENNOP_As_Input
+v_u_1_0_0_ENNOP_Not_Output_to_Operator
   , v_u_1_0_1_No_ENNFT_On_Validator_Output
   , v_u_1_0_2_No_Minting_Allowed
   , v_u_1_0_3_No_Burning_Allowed
@@ -56,7 +56,7 @@ v_u_1_0_0_No_ENNOP_As_Input
   , v_u_1_1_2_ENNFT_Cardinality_Above_1
     :: BuiltinString
 -- `Property 1.0` : Tokens Quantities are verified
-v_u_1_0_0_No_ENNOP_As_Input = "u.1.0.0"
+v_u_1_0_0_ENNOP_Not_Output_to_Operator = "u.1.0.0"
 v_u_1_0_1_No_ENNFT_On_Validator_Output = "u.1.0.1"
 v_u_1_0_2_No_Minting_Allowed = "u.1.0.2"
 v_u_1_0_3_No_Burning_Allowed = "u.1.0.3"
@@ -71,7 +71,7 @@ v_u_1_1_2_ENNFT_Cardinality_Above_1 = "u.1.1.2"
 mk_u_ENOP_NFT_msgs :: NFTPropertyViolationMsg
 mk_u_ENOP_NFT_msgs =
   NFTPropertyViolationMsg
-    { whenNoNFT = v_u_1_0_0_No_ENNOP_As_Input
+    { whenNoNFT = v_u_1_0_0_ENNOP_Not_Output_to_Operator
     , whenQuantityMoreThanOne = "can't happen"
     , whenMultipleTokenNamesForSameCurrencySymbol = v_u_1_1_1_ENOP_NFT_Cardinality_Above_1
     }

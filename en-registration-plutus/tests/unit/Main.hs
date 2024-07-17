@@ -8,9 +8,11 @@ module Main (
 import GHC.IO.Encoding (setLocaleEncoding, utf8)
 
 -- import qualified Specs.Aya.Registration.Core.Property.Datum.Violations as Property.Datum
--- import qualified Specs.Aya.Registration.Core.Property.NFT.Ownership.Violations as Property.NFT.Ownership
 
 import qualified Specs.Aya.Registration.Core.Deregister.NominalCase as Deregister.Nominal.Case
+import qualified Specs.Aya.Registration.Core.Property.NFT.Ownership.Deregister.Violations as Property.NFT.Ownership.Deregister
+import qualified Specs.Aya.Registration.Core.Property.NFT.Ownership.Register.Violations as Property.NFT.Ownership.Register
+import qualified Specs.Aya.Registration.Core.Property.NFT.Ownership.Update.Violations as Property.NFT.Ownership.Update
 import qualified Specs.Aya.Registration.Core.Property.NFT.Transitivity.Deregister.Violations as Property.NFT.Transitivity.Deregister
 import qualified Specs.Aya.Registration.Core.Property.NFT.Transitivity.Register.Violations as Property.NFT.Transitivity.Register
 import qualified Specs.Aya.Registration.Core.Property.NFT.Transitivity.Update.Violations as Property.NFT.Transitivity.Update
@@ -45,7 +47,12 @@ main = do
               , Property.NFT.Transitivity.Update.specs keys
               , Property.NFT.Transitivity.Deregister.specs keys
               ]
-              -- , Property.NFT.Ownership.specs keys
+          , testGroup
+              "Property 2 - Preserving NFTs ownership : ENOP and ENNFT can be swapped only between the operator and the registration smart contract"
+              [ Property.NFT.Ownership.Register.specs keys
+              , Property.NFT.Ownership.Update.specs keys
+              , Property.NFT.Ownership.Deregister.specs keys
+              ]
               -- ,  Property.Datum.specs keys
           ]
       , testGroup

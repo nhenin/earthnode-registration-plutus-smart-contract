@@ -13,6 +13,8 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# HLINT ignore "Use second" #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE NoImplicitPrelude #-}
@@ -21,14 +23,11 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:conservative-optimisation #-}
 
-{-# HLINT ignore "Use second" #-}
-
 module Aya.Registration.Core.ENOPNFT.MonetaryPolicy.OnChain (
   mkMoneterayPolicyFunction,
   mkUntypedMintingPolicyFunction,
   MonetaryPolicySettings (..),
   Action (..),
-  validateUnregister,
 ) where
 
 import PlutusTx
@@ -40,30 +39,24 @@ import GHC.Generics (Generic)
 import Prelude qualified
 
 import Adapter.Plutus.OnChain (
+  Quantity (..),
+  fromMaybe',
+  getUniqueTokenNameAndQuantity,
+  propertyViolation,
   propertyViolationIfFalse,
   tokenNameGivenToUniqueAndOnlySigner,
  )
 import Aya.Registration.Core.Property.Datum.Register (v_3_2_Registration_Validator_Datim_Not_Authentic)
 import Aya.Registration.Core.Property.NFT.Transitivity.Register
-import Aya.Registration.Core.Validator.OnChain (
-  RegistrationDatum,
-  checkRegistrationSignature,
-  getENNFTTokenName,
-  getENOPNFTTokenName,
-  getRegistrationDatumAndENNFTTokenNameOutput,
- )
+import Aya.Registration.Core.Validator.OnChain
 import Plutus.Script.Utils.Scripts (ValidatorHash (..))
-import Plutus.Script.Utils.Value (flattenValue, valueOf)
-import PlutusLedgerApi.V3 (
-  CurrencySymbol,
-  ScriptContext (scriptContextTxInfo),
-  ScriptHash,
-  TokenName,
-  TxInInfo (txInInfoResolved),
-  TxInfo (txInfoInputs, txInfoMint),
-  TxOut (txOutValue),
-  Value,
+
+import Aya.Registration.Core.Property.NFT.Ownership.Deregister (
+  v_d_2_0_1_Burn_Without_A_Proper_Registration_Validator_Input,
  )
+import Aya.Registration.Core.Property.NFT.Ownership.Register (mk_r_Ownerhip_ENOP_NFT)
+import Aya.Registration.Core.Property.NFT.Transitivity.Deregister (mk_d_EN_NFT_msgs)
+import PlutusLedgerApi.V3
 import PlutusLedgerApi.V3.Contexts (ownCurrencySymbol)
 
 data MonetaryPolicySettings = MonetaryPolicySettings
@@ -98,7 +91,7 @@ PlutusTx.makeLift ''Action
 {-# INLINEABLE mkMoneterayPolicyFunction #-}
 mkMoneterayPolicyFunction :: MonetaryPolicySettings -> Action -> ScriptContext -> Bool
 mkMoneterayPolicyFunction sp Mint ctx = canMintENOPNFT sp (ownCurrencySymbol ctx) (scriptContextTxInfo ctx)
-mkMoneterayPolicyFunction _ Burn ctx = validateUnregister (ownCurrencySymbol ctx) (scriptContextTxInfo ctx)
+mkMoneterayPolicyFunction sp Burn ctx = canBurnENOPNFT sp ctx
 
 {-# INLINEABLE mkUntypedMintingPolicyFunction #-}
 mkUntypedMintingPolicyFunction :: MonetaryPolicySettings -> BuiltinData -> BuiltinData -> ()
@@ -137,41 +130,45 @@ canMintENOPNFT' enopNFTCurrencySymbol txInfo (registrationDatum, ennftTokenName)
     mustOutputENOPNFTToOperator =
       propertyViolationIfFalse
         v_r_1_1_1_ENOP_NFT_Cardinality_Above_1
-        (ennftTokenName == tokenNameGivenToUniqueAndOnlySigner mk_r_ENOP_NFT_msgs enopNFTCurrencySymbol txInfo)
+        (ennftTokenName == tokenNameGivenToUniqueAndOnlySigner mk_r_Ownerhip_ENOP_NFT enopNFTCurrencySymbol txInfo)
 
----- Below needs to be refined
+{-# INLINEABLE canBurnENOPNFT #-}
 
-{-# INLINEABLE validateUnregister #-}
-validateUnregister :: CurrencySymbol -> TxInfo -> Bool
-validateUnregister ocs info
-  | traceIfFalse "enOpNftBurnt" $ enOpBurnt ocs (txInfoMint info) info = True
-  | otherwise = False
+-- | Check if the ENOP NFT can be burnt by only checking if the Tx references a corresponding Registration validator Input
+-- | Deregistering Rules are implemented at the Registration Validator Level
+canBurnENOPNFT :: MonetaryPolicySettings -> ScriptContext -> Bool
+canBurnENOPNFT = hasARegistratedENNFTInScriptAsInput
 
-{-- enOpBurnt --}
--- Make sure the Token is burnt
-{-# INLINEABLE enOpBurnt #-}
-enOpBurnt :: CurrencySymbol -> Value -> TxInfo -> Bool
-enOpBurnt cs v info =
-  let tn = getTokenName' (txInfoInputs info) cs
-      burn_amt = case tn of
-        Just tn' -> valueOf v cs tn'
-        Nothing -> 0
-   in burn_amt == -1
+{-# INLINEABLE hasARegistratedENNFTInScriptAsInput #-}
+hasARegistratedENNFTInScriptAsInput :: MonetaryPolicySettings -> ScriptContext -> Bool
+hasARegistratedENNFTInScriptAsInput MonetaryPolicySettings{ennftCurrencySymbol, registrationValidatorHash} =
+  ( \case
+      (_, One) -> True -- means there is a ENNFT in the Registration script as input
+      _ -> propertyViolation v_d_2_0_1_Burn_Without_A_Proper_Registration_Validator_Input
+  )
+    . getUniqueTokenNameAndQuantity mk_d_EN_NFT_msgs ennftCurrencySymbol
+    . ( \case
+          TxOut
+            { txOutAddress = Address (ScriptCredential _) _
+            , txOutValue = v
+            , txOutReferenceScript = Nothing
+            } -> v
+          _ -> propertyViolation v_d_2_0_1_Burn_Without_A_Proper_Registration_Validator_Input
+      )
+    . txInInfoResolved
+    . fromMaybe' (propertyViolation v_d_2_0_1_Burn_Without_A_Proper_Registration_Validator_Input)
+    . findRegistrationValidatorInput registrationValidatorHash
 
-{-- getTokenName --}
--- We determine the TokenName from the input of the registration smart contract,
--- we know it must be exactly one available which must have the same tokenname as the ENOOPNFT
-{-# INLINEABLE getTokenName' #-}
-getTokenName' :: [TxInInfo] -> CurrencySymbol -> Maybe TokenName
-getTokenName' is cs =
-  let filter' :: TxInInfo -> [Maybe TokenName]
-      filter' i = fn $ flattenValue (txOutValue $ txInInfoResolved i)
-        where
-          fn [] = []
-          fn ((cs', tn', amt') : ls) = if cs == cs' && amt' == 1 then [Just tn'] else fn ls
-
-      os [] = []
-      os (x : xs) = filter' x ++ os xs
-   in case os is of
-        [h] -> h
-        _ -> traceError "more than one registration input or none"
+{-# INLINEABLE findRegistrationValidatorInput #-}
+findRegistrationValidatorInput :: ScriptHash -> ScriptContext -> Maybe TxInInfo
+findRegistrationValidatorInput
+  registrationValidatorHash
+  ScriptContext
+    { scriptContextTxInfo = TxInfo{txInfoInputs}
+    } =
+    find
+      ( \case
+          TxInInfo{txInInfoResolved = TxOut{txOutAddress = Address (ScriptCredential givenScriptHash) _}} -> givenScriptHash == registrationValidatorHash
+          _ -> False
+      )
+      txInfoInputs

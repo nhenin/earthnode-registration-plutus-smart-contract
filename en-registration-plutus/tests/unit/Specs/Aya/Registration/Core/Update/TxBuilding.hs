@@ -14,6 +14,8 @@ module Specs.Aya.Registration.Core.Update.TxBuilding (
   updateMultipleValidatorsDetailsAtOnce,
   updateWithMoreThanOneENNFT,
   updateWithMoreThanOneENOPNFT,
+  updateAndGiveTheENOPNFTToAnotherOperator,
+  updateWith2WalletSigning,
 ) where
 
 import Cooked
@@ -95,6 +97,67 @@ update keyPair registratedItemId@(settings, enopNFT) newCommission operator newO
         , txSkelOpts = def{txOptEnsureMinAda = True}
         , txSkelValidityRange = Api.always
         , txSkelSigners = [operator]
+        , txSkelIns = Map.singleton registeredItemRef (TxSkelRedeemerForScript UpdateRegistrationDetails)
+        , txSkelInsReference = Set.empty
+        , txSkelOuts =
+            [ paysPK
+                operator
+                (V3.singleton (associatedENOPNFTCurrencySymbol settings) (tokenName enopNFT) 1)
+            , paysScriptInlineDatum
+                (typedRegistrationValidator settings)
+                ( RegistrationDatum
+                    { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
+                    , signature = toBuiltin signedMessage
+                    , ennftTokenName = tokenName enopNFT
+                    , cardanoRewardPubKey = walletPKHash newOperator
+                    , commission = newCommission
+                    , enopNFTCurrencySymbol = associatedENOPNFTCurrencySymbol settings
+                    }
+                )
+                (V3.singleton (ennftCurrencySymbol settings) (tokenName enopNFT) 1)
+            ]
+        }
+  return registratedItemId
+
+updateWith2WalletSigning
+  :: (ContextDSIGN a ~ (), DSIGNAlgorithm a, Signable a ByteString)
+  => (MonadBlockChain m)
+  => KeyPair a
+  -> (RegistrationValidatorSettings, ENOPNFT)
+  -> Commission
+  -> Wallet
+  -> Wallet
+  -> m (RegistrationValidatorSettings, ENOPNFT)
+updateWith2WalletSigning keyPair registratedItemId@(settings, enopNFT) newCommission operator newOperator = do
+  registeredItemRef <-
+    ( fst
+        . fromMaybe (error "No ENNFT found on registration validator utxos.")
+        . headMay
+        <$>
+      )
+      . runUtxoSearch
+      . flip filterWithPred (containsENNFT registratedItemId . outputValue)
+      . utxosAtSearch
+      $ registrationValidatorAddress settings
+
+  let signedMessage =
+        sign
+          (signatureKey keyPair)
+          ( fromBuiltin $
+              mkHashedRegistrationMessage
+                (tokenName enopNFT)
+                (walletPKHash newOperator)
+                newCommission
+                (associatedENOPNFTCurrencySymbol settings)
+          )
+  _ <-
+    validateTxSkel $
+      txSkelTemplate
+        { txSkelMints = Map.empty
+        , txSkelLabel = Set.empty
+        , txSkelOpts = def{txOptEnsureMinAda = True}
+        , txSkelValidityRange = Api.always
+        , txSkelSigners = [operator, newOperator]
         , txSkelIns = Map.singleton registeredItemRef (TxSkelRedeemerForScript UpdateRegistrationDetails)
         , txSkelInsReference = Set.empty
         , txSkelOuts =
@@ -688,6 +751,67 @@ updateWithMoreThanOneENNFT keyPair registratedItemId1@(settings, registeredEnopN
             ]
         }
   return registratedItemId1
+
+updateAndGiveTheENOPNFTToAnotherOperator
+  :: (ContextDSIGN a ~ (), DSIGNAlgorithm a, Signable a ByteString)
+  => (MonadBlockChain m)
+  => KeyPair a
+  -> (RegistrationValidatorSettings, ENOPNFT)
+  -> Commission
+  -> Wallet
+  -> Wallet
+  -> m (RegistrationValidatorSettings, ENOPNFT)
+updateAndGiveTheENOPNFTToAnotherOperator keyPair registratedItemId@(settings, enopNFT) newCommission operator newOperator = do
+  registeredItemRef <-
+    ( fst
+        . fromMaybe (error "No ENNFT found on registration validator utxos.")
+        . headMay
+        <$>
+      )
+      . runUtxoSearch
+      . flip filterWithPred (containsENNFT registratedItemId . outputValue)
+      . utxosAtSearch
+      $ registrationValidatorAddress settings
+
+  let signedMessage =
+        sign
+          (signatureKey keyPair)
+          ( fromBuiltin $
+              mkHashedRegistrationMessage
+                (tokenName enopNFT)
+                (walletPKHash newOperator)
+                newCommission
+                (associatedENOPNFTCurrencySymbol settings)
+          )
+  _ <-
+    validateTxSkel $
+      txSkelTemplate
+        { txSkelMints = Map.empty
+        , txSkelLabel = Set.empty
+        , txSkelOpts = def{txOptEnsureMinAda = True}
+        , txSkelValidityRange = Api.always
+        , txSkelSigners = [operator]
+        , txSkelIns = Map.singleton registeredItemRef (TxSkelRedeemerForScript UpdateRegistrationDetails)
+        , txSkelInsReference = Set.empty
+        , txSkelOuts =
+            [ paysPK
+                newOperator
+                (V3.singleton (associatedENOPNFTCurrencySymbol settings) (tokenName enopNFT) 1)
+            , paysScriptInlineDatum
+                (typedRegistrationValidator settings)
+                ( RegistrationDatum
+                    { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
+                    , signature = toBuiltin signedMessage
+                    , ennftTokenName = tokenName enopNFT
+                    , cardanoRewardPubKey = walletPKHash newOperator
+                    , commission = newCommission
+                    , enopNFTCurrencySymbol = associatedENOPNFTCurrencySymbol settings
+                    }
+                )
+                (V3.singleton (ennftCurrencySymbol settings) (tokenName enopNFT) 1)
+            ]
+        }
+  return registratedItemId
 
 containsENNFT :: (RegistrationValidatorSettings, ENOPNFT) -> Value -> Bool
 containsENNFT (settings, enopNFT) (Value v) =

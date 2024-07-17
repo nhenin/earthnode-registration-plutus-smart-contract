@@ -34,6 +34,7 @@ module Adapter.Plutus.OnChain (
   hasAnyPositiveQuantities,
   hasAnyNegativeQuantity,
   isZero,
+  getUniqueTokenNameAndQuantity,
 ) where
 
 import PlutusTx.Prelude hiding (any)
@@ -45,6 +46,7 @@ import Aya.Registration.Core.Property.Violation (
   NFTPropertyViolationMsg (..),
  )
 
+import Aya.Registration.Core.Property.NFT.Ownership.UniqueSigner (v_2_2_1_More_Than_One_Signer)
 import Plutus.Script.Utils.V3.Contexts (valueSpent)
 import PlutusLedgerApi.V3.Contexts (valuePaidTo)
 import PlutusTx qualified
@@ -88,7 +90,7 @@ hasAnyNegativeQuantity (Value xs) = any (any (\i -> i < 0)) xs
 {-# INLINEABLE convertToQuantity #-}
 convertToQuantity :: Integer -> Quantity
 convertToQuantity x
-  | x <= 0 = propertyViolation "Ledger Property - Quantity can't be negative or zero"
+  | x <= 0 = propertyViolation "Quantity can't be negative or zero"
   | 1 == x = One
   | otherwise = MoreThanOne
 
@@ -164,7 +166,7 @@ getUniqueSigner =
   \case
     [] -> propertyViolation "Ledger Property - At least one signer is required"
     [pkh] -> pkh
-    _ -> propertyViolation "2.1.1"
+    _ -> propertyViolation v_2_2_1_More_Than_One_Signer
     . txInfoSignatories
 
 -- | Get the token name of the NFT given to the unique and only signer

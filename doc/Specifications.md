@@ -84,7 +84,7 @@ The following information is required as input for the smart contract transactio
       - `r.1.1.2 violation` - |EN NFT|   > 1 (Cardinality Violation)
 - **Update** 
   - `Property 1.0` : Tokens Quantities are verified
-    - `u.1.0.0 violation` - No ENNOP as Input
+    - `u.1.0.0 violation` - ENNOP Not Output to Operator
     - `u.1.0.1 violation` - No ENNFT on Registration validator output    
     - `u.1.0.2 violation` - No Minting Allowed  
     - `u.1.0.3 violation` - No Burning Allowed                             
@@ -108,7 +108,7 @@ The following information is required as input for the smart contract transactio
 
 - **Register**
   - `Property 2.0` : ENOP NFT should be given to the operator
-    - `2.0.0 violation` - ENNOP Minted Not Output to Operator                    
+    - `r.2.0.0 violation` - ENNOP Minted Not Output to Operator                    
   - `Property 2.1` : ENNFT should be output on script (Already Validated by - `1.0.2 violation` - No ENNFT on Registration validator output  )
   - `Property 2.2` : Only the operator should sign the transaction
     - `2.1.0 violation` - No signer found (Enforced by Ledger Properties)        
@@ -116,18 +116,17 @@ The following information is required as input for the smart contract transactio
                   
 - **Update**
   - `Property 2.0` : ENOP NFT should be spent and given back to the operator
-    - `2.0.0 violation` - No ENNOP as Input (Already Validated by - `1.0.0 violation` )                   
-    - `2.0.1 violation` - ENNOP Not Output to Operator
-  - `Property 2.1` : ENNFT should be output on script (Already Validated by - `1.0.2 violation` - No ENNFT on Registration validator output  )
+    - `u.2.0.0 violation` -ENNOP Not Output to Operator(Already Validated by - `u.1.0.0 violation` )                   
+  - `Property 2.1` : ENNFT should be output on script (Already Validated by - `u.1.0.2 violation` - No ENNFT on Registration validator output  )
   - `Property 2.2` : Only the operator should sign the transaction
     - `2.1.0 violation` - No signer found (Enforced by Ledger Properties)        
     - `2.1.1 violation` - signer is not unique 
                   
 - **Deregister** 
   - `Property 2.0` : ENOP NFT should be spent from the operator and burnt
-    - `2.0.0 violation` - No ENNOP as Input                    
-    - `2.0.1 violation` - No ENNOP Burn (Already Validated by - `1.0.0 violation` )
-  - `Property 2.1` : ENNFT should be spent from Registration scipt and output to Operator (Already Validated by - `1.0.1 violation` )
+    - `d.2.0.0 violation` - No ENNOP Burn (Already Validated by - `d.1.0.0 violation` )
+    - `d.2.0.1 violation` - Burn Without A Proper Registration Validator Input Not Allowed 
+  - `Property 2.1` : ENNFT should be spent from Registration scipt and output to Operator (Already Validated by - `d.1.0.1 violation` )
 
   - `Property 2.2` : Only the operator should sign the transaction
     - `2.1.0 violation` - No signer found (Enforced by Ledger Properties)        

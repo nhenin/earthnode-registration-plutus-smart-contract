@@ -35,7 +35,7 @@ specs keys =
             forAll (genFixtureNominalCase keys) $
               \FixtureNominalCase{..} ->
                 shouldViolateAProperty
-                  v_u_1_0_0_No_ENNOP_As_Input
+                  v_u_1_0_0_ENNOP_Not_Output_to_Operator
                   (registrationCookedConfig . currencySymbol $ ennft)
                   genesis
                   $ do
