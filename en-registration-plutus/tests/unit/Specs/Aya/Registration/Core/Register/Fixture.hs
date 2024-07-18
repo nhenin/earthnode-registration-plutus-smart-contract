@@ -33,7 +33,7 @@ import Data.Coerce
 import Data.List.NonEmpty qualified as NL
 
 import Adapter.Cooked ()
-import Adapter.Plutus.Gen (anyAtleast2ENNFTWithSameCurrency, anyENNFT, genByteStringOf)
+import Adapter.Plutus.Gen (anyAtleast2ENNFTWithSameCurrency, anyCurrencySymbol, anyENNFT, genByteStringOf)
 import Aya.Registration.Core.Validator.Builder
 import Aya.Registration.Core.Validator.OnChain
 import PlutusLedgerApi.V3 (
@@ -84,6 +84,7 @@ data FixtureMultipleENNFTs a = FixtureMultipleENNFTs
   , ennftCurrencySymbol :: CurrencySymbol
   , firstEnnftTn :: TokenName
   , ennftsTokenNames :: NL.NonEmpty TokenName
+  , anotherDifferentENNftCurrencySymbol :: CurrencySymbol
   }
 
 instance Show (FixtureMultipleENNFTs a) where
@@ -161,6 +162,7 @@ genFixtureMultipleENNFTs :: [KeyPair a] -> Gen (FixtureMultipleENNFTs a)
 genFixtureMultipleENNFTs keypairs = do
   aSubstrateKeyPair <- elements keypairs
   (aCurrencySymbol, aFirstEnnftTn, anEnnftsTokenNames) <- anyAtleast2ENNFTWithSameCurrency
+  anotherDifferentENNftCurrencySymbol <- anyCurrencySymbol `suchThat` (/= aCurrencySymbol)
   aCommission <- chooseInteger (0, 100)
   pure
     FixtureMultipleENNFTs
@@ -183,6 +185,7 @@ genFixtureMultipleENNFTs keypairs = do
       , ennftCurrencySymbol = aCurrencySymbol
       , firstEnnftTn = aFirstEnnftTn
       , ennftsTokenNames = anEnnftsTokenNames
+      , anotherDifferentENNftCurrencySymbol = anotherDifferentENNftCurrencySymbol
       }
 
 genFixtureWithInvalidSignature

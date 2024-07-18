@@ -24,6 +24,8 @@ module Specs.Aya.Registration.Core.Register.TxBuilding (
   registerWithNoRegistrationDatum,
   registerWithHashedRegistrationDatum,
   registerMoreThanOneOperator,
+  registerWithWrongEnnftTokenNameDatum,
+  registerWithWrongEnopNftCurrencySymbolInDatum,
 ) where
 
 import Cooked
@@ -596,6 +598,113 @@ registerWithDifferentENandENOPNFTTokenNames keyPair ennft enoptTokenName givenCo
     NFT
       (associatedENOPNFTCurrencySymbol settings)
       (tokenName ennft)
+
+registerWithWrongEnopNftCurrencySymbolInDatum
+  :: (ContextDSIGN a ~ (), DSIGNAlgorithm a, Signable a ByteString)
+  => (MonadBlockChain m)
+  => KeyPair a
+  -> ENNFT
+  -> CurrencySymbol
+  -> Commission
+  -> Wallet
+  -> m (RegistrationValidatorSettings, ENOPNFT)
+registerWithWrongEnopNftCurrencySymbolInDatum keyPair ennft anotherDifferentENNftCurrencySymbol givenCommission givenOperator = do
+  let settings = RegistrationValidatorSettings . currencySymbol $ ennft
+      anotherSetting = RegistrationValidatorSettings anotherDifferentENNftCurrencySymbol
+      signedMessage =
+        sign
+          (signatureKey keyPair)
+          ( fromBuiltin $
+              mkHashedRegistrationMessage
+                (tokenName ennft)
+                (walletPKHash givenOperator)
+                givenCommission
+                (associatedENOPNFTCurrencySymbol anotherSetting) -- using a different currency symbol in datum for ENOPNFT
+          )
+  _ <-
+    validateTxSkel $
+      txSkelTemplate
+        { txSkelMints =
+            txSkelMintsFromList [(associatedENOPNFTMonetaryPolicy settings, SomeMintsRedeemer Mint, tokenName ennft, 1)]
+        , txSkelLabel = Set.empty
+        , txSkelOpts = def{txOptEnsureMinAda = True}
+        , txSkelValidityRange = Api.always
+        , txSkelSigners = [givenOperator]
+        , txSkelIns = Map.empty
+        , txSkelInsReference = Set.empty
+        , txSkelOuts =
+            [ paysPK
+                givenOperator
+                (V3.singleton (associatedENOPNFTCurrencySymbol settings) (tokenName ennft) 1)
+            , paysScriptInlineDatum
+                (typedRegistrationValidator settings)
+                ( RegistrationDatum
+                    { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
+                    , signature = toBuiltin signedMessage
+                    , ennftTokenName = tokenName ennft
+                    , cardanoRewardPubKey = walletPKHash givenOperator
+                    , commission = givenCommission
+                    , enopNFTCurrencySymbol = associatedENOPNFTCurrencySymbol anotherSetting
+                    }
+                )
+                (V3.singleton (currencySymbol ennft) (tokenName ennft) 1)
+            ]
+        }
+
+  return (settings, NFT (associatedENOPNFTCurrencySymbol settings) (tokenName ennft))
+
+registerWithWrongEnnftTokenNameDatum
+  :: (ContextDSIGN a ~ (), DSIGNAlgorithm a, Signable a ByteString)
+  => (MonadBlockChain m)
+  => KeyPair a
+  -> ENNFT
+  -> ENNFT
+  -> Commission
+  -> Wallet
+  -> m (RegistrationValidatorSettings, ENOPNFT)
+registerWithWrongEnnftTokenNameDatum keyPair ennft wrongEnnft givenCommission givenOperator = do
+  let settings = RegistrationValidatorSettings . currencySymbol $ ennft
+      signedMessage =
+        sign
+          (signatureKey keyPair)
+          ( fromBuiltin $
+              mkHashedRegistrationMessage
+                (tokenName wrongEnnft)
+                (walletPKHash givenOperator)
+                givenCommission
+                (associatedENOPNFTCurrencySymbol settings)
+          )
+  _ <-
+    validateTxSkel $
+      txSkelTemplate
+        { txSkelMints =
+            txSkelMintsFromList [(associatedENOPNFTMonetaryPolicy settings, SomeMintsRedeemer Mint, tokenName ennft, 1)]
+        , txSkelLabel = Set.empty
+        , txSkelOpts = def{txOptEnsureMinAda = True}
+        , txSkelValidityRange = Api.always
+        , txSkelSigners = [givenOperator]
+        , txSkelIns = Map.empty
+        , txSkelInsReference = Set.empty
+        , txSkelOuts =
+            [ paysPK
+                givenOperator
+                (V3.singleton (associatedENOPNFTCurrencySymbol settings) (tokenName ennft) 1)
+            , paysScriptInlineDatum
+                (typedRegistrationValidator settings)
+                ( RegistrationDatum
+                    { ayaValidatorPublicKey = toBuiltin . toByteString . verificationKey $ keyPair
+                    , signature = toBuiltin signedMessage
+                    , ennftTokenName = tokenName wrongEnnft
+                    , cardanoRewardPubKey = walletPKHash givenOperator
+                    , commission = givenCommission
+                    , enopNFTCurrencySymbol = associatedENOPNFTCurrencySymbol settings
+                    }
+                )
+                (V3.singleton (currencySymbol ennft) (tokenName ennft) 1)
+            ]
+        }
+
+  return (settings, NFT (associatedENOPNFTCurrencySymbol settings) (tokenName ennft))
 
 registerWithInvalidDatumVerification
   :: (ContextDSIGN a ~ (), DSIGNAlgorithm a, Signable a ByteString)

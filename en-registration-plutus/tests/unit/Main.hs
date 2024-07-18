@@ -7,7 +7,8 @@ module Main (
 
 import GHC.IO.Encoding (setLocaleEncoding, utf8)
 
--- import qualified Specs.Aya.Registration.Core.Property.Datum.Violations as Property.Datum
+import qualified Specs.Aya.Registration.Core.Property.Datum.Register.Violations as Property.Datum.Register
+import qualified Specs.Aya.Registration.Core.Property.Datum.Update.Violations as Property.Datum.Update
 
 import qualified Specs.Aya.Registration.Core.Deregister.NominalCase as Deregister.Nominal.Case
 import qualified Specs.Aya.Registration.Core.Property.NFT.Ownership.Deregister.Violations as Property.NFT.Ownership.Deregister
@@ -53,7 +54,12 @@ main = do
               , Property.NFT.Ownership.Update.specs keys
               , Property.NFT.Ownership.Deregister.specs keys
               ]
-              -- ,  Property.Datum.specs keys
+          , testGroup
+              "Property 3 - Datum Authenticity & Validity : The registration details (datum) should be verifiable and Valid (Signed and Provided by the owner of the ENNFT)"
+              [ Property.Datum.Register.specs keys
+              , Property.Datum.Update.specs keys
+              , Property.NFT.Ownership.Deregister.specs keys
+              ]
           ]
       , testGroup
           "Off Chain"

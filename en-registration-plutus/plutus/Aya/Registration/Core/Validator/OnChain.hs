@@ -51,13 +51,7 @@ import PlutusTx.Builtins qualified as Cryptography
 import Adapter.Plutus.OnChain
 import PlutusTx.Applicative ()
 
-import Aya.Registration.Core.Property.Datum.Register (
-  v_3_1_Registration_Datum_Not_Deserializable,
-  v_3_3_Registration_Validator_Output_NotFound,
-  v_3_4_Registration_Validator_Has_No_Datum,
-  v_3_5_Registration_Validator_Has_Only_Hashed_Datum,
-  v_3_6_More_Than_1_Registration_Validator_Output,
- )
+import Aya.Registration.Core.Property.Datum.Register
 import Aya.Registration.Core.Property.NFT.Transitivity.Deregister
 import Aya.Registration.Core.Property.NFT.Transitivity.Update
 import Aya.Registration.Core.Property.Violation
@@ -155,20 +149,30 @@ canUpdateRegistration RegistrationValidatorSettings{..} ctx =
         && propertyViolationIfFalse
           v_u_1_1_0_ENOP_NFT_TokenName_Not_Equal_To_ENNFT_TokenName
           (enopNFTNameOutput == ennftTokenNameOutput)
-        && checkRegistrationSignature datumInput
-        && propertyViolationIfFalse "Datum to spent is invalid" (checkRegistrationSignature datumOutput)
         && propertyViolationIfFalse
-          "Changing the ennft token name in the datum is not allowed"
-          (ennftTokenNameInput == ennftTokenNameOutput)
+          v_3_2_i_Registration_Validator_Input_Datum_Not_Authentic
+          (checkRegistrationSignature datumInput)
         && propertyViolationIfFalse
-          "Changing the ennft token name in the datum is not allowed"
-          (enopNFTNameInput == enopNFTNameOutput)
-        && ennftTokenName datumInput
-        == ennftTokenName datumOutput
-        && enopNFTNameOutput
-        == ennftTokenName datumOutput
-        && enopNFTCurrencySymbol datumInput
-        == enopNFTCurrencySymbol datumOutput
+          v_3_2_o_Registration_Validator_Output_Datum_Not_Authentic
+          (checkRegistrationSignature datumOutput)
+        && propertyViolationIfFalse
+          v_3_0_1_o_Registration_Datum_Field_ENNFT_TokenName_Not_Valid
+          ( ennftTokenName datumInput
+              == ennftTokenName datumOutput
+              && ennftTokenNameInput
+              == ennftTokenNameOutput
+              && ennftTokenNameOutput
+              == ennftTokenName datumOutput
+          )
+        && propertyViolationIfFalse
+          v_3_0_2_o_Registration_Datum_Field_ENOP_NFT_Currency_Symbol_Not_Valid
+          ( enopNFTCurrencySymbol datumInput
+              == enopNFTCurrencySymbol datumOutput
+              && enopNFTNameInput
+              == enopNFTNameOutput
+              && enopNFTNameOutput
+              == ennftTokenName datumOutput
+          )
 
 {-# INLINEABLE shouldNotMintOrBurn #-}
 shouldNotMintOrBurn :: TxInfo -> Bool
@@ -200,20 +204,26 @@ getRegistrationDatumAndENNFTTokenNameOutput
   :: ScriptHash -> (Value -> TokenName) -> TxInfo -> (RegistrationDatum, TokenName)
 getRegistrationDatumAndENNFTTokenNameOutput registrationValidatorHash getENNFTTokenName' =
   \case
-    [] -> propertyViolation v_3_3_Registration_Validator_Output_NotFound
-    [(OutputDatum (Datum scriptDatum), scriptValue)] -> (deserializeDatum scriptDatum, getENNFTTokenName' scriptValue)
-    [(NoOutputDatum, _)] -> propertyViolation v_3_3_Registration_Validator_Output_NotFound
-    [(OutputDatumHash _, _)] -> propertyViolation v_3_5_Registration_Validator_Has_Only_Hashed_Datum
-    _ -> propertyViolation v_3_6_More_Than_1_Registration_Validator_Output
+    [] -> propertyViolation v_3_3_o_Registration_Validator_Output_NotFound
+    [(OutputDatum (Datum scriptDatum), scriptValue)] ->
+      ( fromMaybe' (propertyViolation v_3_1_o_Registration_Output_Datum_Not_Deserializable) . deserializeDatum $ scriptDatum
+      , getENNFTTokenName' scriptValue
+      )
+    [(NoOutputDatum, _)] -> propertyViolation v_3_4_o_Registration_Validator_Output_Has_No_Datum
+    [(OutputDatumHash _, _)] -> propertyViolation v_3_5_o_Registration_Validator_Output_Has_Only_Hashed_Datum
+    _ -> propertyViolation v_3_6_o_More_Than_1_Registration_Validator_Output
     . scriptOutputsAt registrationValidatorHash
 
 {-# INLINEABLE getRegistrationDatumAndENNFTTokenNameInput #-}
 getRegistrationDatumAndENNFTTokenNameInput :: (Value -> TokenName) -> ScriptContext -> (RegistrationDatum, TokenName)
 getRegistrationDatumAndENNFTTokenNameInput getENNFTTokenName' =
   \case
-    (OutputDatum (Datum scriptDatum), scriptValue) -> (deserializeDatum scriptDatum, getENNFTTokenName' scriptValue)
-    (NoOutputDatum, _) -> propertyViolation v_3_4_Registration_Validator_Has_No_Datum
-    (OutputDatumHash _, _) -> propertyViolation v_3_5_Registration_Validator_Has_Only_Hashed_Datum
+    (OutputDatum (Datum scriptDatum), scriptValue) ->
+      ( fromMaybe' (propertyViolation v_3_1_i_Registration_Input_Datum_Not_Deserializable) . deserializeDatum $ scriptDatum
+      , getENNFTTokenName' scriptValue
+      )
+    (NoOutputDatum, _) -> propertyViolation v_3_4_i_Registration_Validator_Input_Has_No_Datum
+    (OutputDatumHash _, _) -> propertyViolation v_3_5_i_Registration_Validator_Input_Has_Only_Hashed_Datum
     . ( \case
           TxOut
             { txOutAddress = Address (ScriptCredential _) _
@@ -221,17 +231,15 @@ getRegistrationDatumAndENNFTTokenNameInput getENNFTTokenName' =
             , txOutDatum = d
             , txOutReferenceScript = Nothing
             } -> (d, v)
-          _ -> propertyViolation "Invalid Registration Input"
+          _ -> propertyViolation v_3_3_i_Registration_Validator_Input_NotFound
       )
     . txInInfoResolved
-    . fromMaybe' (propertyViolation "No Registration Input Found")
+    . fromMaybe' (propertyViolation v_3_3_i_Registration_Validator_Input_NotFound)
     . findOwnInput
 
 {-# INLINEABLE deserializeDatum #-}
-deserializeDatum :: BuiltinData -> RegistrationDatum
-deserializeDatum =
-  fromMaybe' (propertyViolation v_3_1_Registration_Datum_Not_Deserializable)
-    . fromBuiltinData
+deserializeDatum :: BuiltinData -> Maybe RegistrationDatum
+deserializeDatum = fromBuiltinData
 
 {-# INLINEABLE getENOPNFTTokenName #-}
 getENOPNFTTokenName :: NFTPropertyViolationMsg -> CurrencySymbol -> TxInfo -> TokenName

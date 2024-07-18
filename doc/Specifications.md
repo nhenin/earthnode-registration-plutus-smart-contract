@@ -110,72 +110,32 @@ The following information is required as input for the smart contract transactio
   - `Property 2.0` : ENOP NFT should be given to the operator
     - `r.2.0.0 violation` - ENNOP Minted Not Output to Operator                    
   - `Property 2.1` : ENNFT should be output on script (Already Validated by - `1.0.2 violation` - No ENNFT on Registration validator output  )
-  - `Property 2.2` : Only the operator should sign the transaction
-    - `2.1.0 violation` - No signer found (Enforced by Ledger Properties)        
-    - `2.1.1 violation` - signer is not unique 
-                  
+          
 - **Update**
   - `Property 2.0` : ENOP NFT should be spent and given back to the operator
     - `u.2.0.0 violation` -ENNOP Not Output to Operator(Already Validated by - `u.1.0.0 violation` )                   
   - `Property 2.1` : ENNFT should be output on script (Already Validated by - `u.1.0.2 violation` - No ENNFT on Registration validator output  )
-  - `Property 2.2` : Only the operator should sign the transaction
-    - `2.1.0 violation` - No signer found (Enforced by Ledger Properties)        
-    - `2.1.1 violation` - signer is not unique 
-                  
+         
 - **Deregister** 
   - `Property 2.0` : ENOP NFT should be spent from the operator and burnt
     - `d.2.0.0 violation` - No ENNOP Burn (Already Validated by - `d.1.0.0 violation` )
     - `d.2.0.1 violation` - Burn Without A Proper Registration Validator Input Not Allowed 
   - `Property 2.1` : ENNFT should be spent from Registration scipt and output to Operator (Already Validated by - `d.1.0.1 violation` )
 
+- **Register & Update & Deregister**
   - `Property 2.2` : Only the operator should sign the transaction
     - `2.1.0 violation` - No signer found (Enforced by Ledger Properties)        
     - `2.1.1 violation` - signer is not unique                                  
 
 ### **Property 3 - Datum Authenticity & Validity** : The registration details (datum) should be verifiable and Valid (Signed and Provided by the owner of the ENNFT)
 
-- **Register**
-    - `3.0 violation` - Registration datum should be valid
-        -  `3.0.1 violation` - `ennftTokenName` field should be equal to the spent ennft token Name
-        -  `3.0.2 violation` - `enopNFTCurrencySymbol` field should be equal to the ENOP NFT currency Symbol minted
-    - `3.1 violation` - Registration datum can not be deserialized
-    - `3.2 violation` - Registration datum is not Auhtentic                              
-    - `3.3 violation` - Registration validator output not found (not verifiable)                 
-    - `3.4 violation` - Registration validator output has no datum (not verifiable)             
-    - `3.5 violation` - Registration validator output has only the hashed datum (not verifiable)  
-    - `3.6 violation` - More than one Registration validator output is not allowed (Reducing complexity)
-- **Update**
-  - `3.0 violation` - Registration datum should be valid
-      -  `3.0.1 violation` - `ennftTokenName` field should be equal to the spent ennft token Name
-            - `3.0.1.0` - for Datum spent
-            - `3.0.1.1` - for Datum output
-      -  `3.0.2 violation` - `enopNFTCurrencySymbol` field should be equal to the ENOP NFT currency Symbol minted
-            - `3.0.2.0` - for Datum spent
-            - `3.0.2.1` - for Datum output
-  - `3.1 violation` - Registration datum can not be deserialized
-      - `3.1.0` - for Datum spent
-      - `3.1.1` - for Datum output
-  - `3.2 violation` - Registration datum is not Auhtentic 
-      - `3.2.0` - for Datum spent
-      - `3.2.1` - for Datum output                             
-  - `3.3 violation` - Registration validator output not found (not verifiable)
-      - `3.3.0` - for Datum spent
-      - `3.3.1` - for Datum output                 
-  - `3.4 violation` - Registration validator output has no datum (not verifiable)
-      - `3.4.0` - for Datum spent
-      - `3.4.1` - for Datum output             
-  - `3.5 violation` - Registration validator output has only the hashed datum (not verifiable)
-      - `3.5.0` - for Datum spent
-      - `3.5.1` - for Datum output  
-  - `3.6 violation` - More than one Registration validator output is not allowed (Reducing complexity)
-
-- **Deregister**
-  - `3.0 violation` - Registration datum spent should be valid
-      -  `3.0.1 violation` - `ennftTokenName` field should be equal to the spent ennft token Name
-      -  `3.0.2 violation` - `enopNFTCurrencySymbol` field should be equal to the ENOP NFT currency Symbol minted
-  - `3.1 violation` - Registration datum spent can not be deserialized
-  - `3.2 violation` - Registration datum spent is not Auhtentic                              
-  - `3.3 violation` - Registration validator output not found (not verifiable)                 
-  - `3.4 violation` - Registration validator output has no datum (not verifiable)             
-  - `3.5 violation` - Registration validator output has only the hashed datum (not verifiable)  
-  - `3.6 violation` - More than one Registration validator output is not allowed (Reducing complexity)
+- **Register & Update**
+    - `3.0.o violation` - Registration datum Output should be valid
+        -  `3.0.1.o violation` - `ennftTokenName` field should be equal to the spent ennft token Name
+        -  `3.0.2.o violation` - `enopNFTCurrencySymbol` field should be equal to the ENOP NFT currency Symbol minted
+    - `3.1.o violation` - Registration datum Output can not be deserialized
+    - `3.2.o violation` - Registration datum Output is not Auhtentic                              
+    - `3.3.o violation` - Registration validator Output not found (not verifiable)                 
+    - `3.4.o violation` - Registration validator Output has no datum (not verifiable)             
+    - `3.5.o violation` - Registration validator Output has only the hashed datum (not verifiable)  
+    - `3.6.o violation` - More than one Registration validator Output is not allowed (Reducing complexity)

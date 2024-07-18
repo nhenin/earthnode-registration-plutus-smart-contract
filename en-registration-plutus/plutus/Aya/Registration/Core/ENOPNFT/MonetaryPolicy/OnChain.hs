@@ -46,7 +46,7 @@ import Adapter.Plutus.OnChain (
   propertyViolationIfFalse,
   tokenNameGivenToUniqueAndOnlySigner,
  )
-import Aya.Registration.Core.Property.Datum.Register (v_3_2_Registration_Validator_Datim_Not_Authentic)
+import Aya.Registration.Core.Property.Datum.Register
 import Aya.Registration.Core.Property.NFT.Transitivity.Register
 import Aya.Registration.Core.Validator.OnChain
 import Plutus.Script.Utils.Scripts (ValidatorHash (..))
@@ -114,23 +114,33 @@ canMintENOPNFT MonetaryPolicySettings{..} enopNFTCurrencySymbol txInfo =
 
 {-# INLINEABLE canMintENOPNFT' #-}
 canMintENOPNFT' :: CurrencySymbol -> TxInfo -> (RegistrationDatum, TokenName) -> Bool
-canMintENOPNFT' enopNFTCurrencySymbol txInfo (registrationDatum, ennftTokenName) =
+canMintENOPNFT' enopNFTCurrencySymbolUsedForMinting txInfo (registrationDatum, ennftTokenNameAsInputValue) =
   mustHaveSameENOPAndENTokenNames
+    && mustHaveValidRegistrationDatumDetails
     && mustHaveAnAuthenticRegistrationDatum
     && mustOutputENOPNFTToOperator
   where
     mustHaveSameENOPAndENTokenNames =
       propertyViolationIfFalse
         v_r_1_1_0_ENOP_NFT_TokenName_Not_Equal_To_ENNFT_TokenName
-        (ennftTokenName == getENOPNFTTokenName mk_r_ENOP_NFT_msgs enopNFTCurrencySymbol txInfo)
+        (ennftTokenNameAsInputValue == getENOPNFTTokenName mk_r_ENOP_NFT_msgs enopNFTCurrencySymbolUsedForMinting txInfo)
+    mustHaveValidRegistrationDatumDetails =
+      propertyViolationIfFalse
+        v_3_0_1_o_Registration_Datum_Field_ENNFT_TokenName_Not_Valid
+        (ennftTokenNameAsInputValue == ennftTokenName registrationDatum)
+        && propertyViolationIfFalse
+          v_3_0_2_o_Registration_Datum_Field_ENOP_NFT_Currency_Symbol_Not_Valid
+          (enopNFTCurrencySymbolUsedForMinting == enopNFTCurrencySymbol registrationDatum)
     mustHaveAnAuthenticRegistrationDatum =
       propertyViolationIfFalse
-        v_3_2_Registration_Validator_Datim_Not_Authentic
+        v_3_2_o_Registration_Validator_Output_Datum_Not_Authentic
         (checkRegistrationSignature registrationDatum)
     mustOutputENOPNFTToOperator =
       propertyViolationIfFalse
         v_r_1_1_1_ENOP_NFT_Cardinality_Above_1
-        (ennftTokenName == tokenNameGivenToUniqueAndOnlySigner mk_r_Ownerhip_ENOP_NFT enopNFTCurrencySymbol txInfo)
+        ( ennftTokenNameAsInputValue
+            == tokenNameGivenToUniqueAndOnlySigner mk_r_Ownerhip_ENOP_NFT enopNFTCurrencySymbolUsedForMinting txInfo
+        )
 
 {-# INLINEABLE canBurnENOPNFT #-}
 
